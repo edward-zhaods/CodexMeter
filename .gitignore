@@ -1,0 +1,13 @@
+.DS_Store
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+
+# Local build and distribution output
+DerivedData/
+build/
+dist/
+*.app
+*.dSYM
+*.dmg
