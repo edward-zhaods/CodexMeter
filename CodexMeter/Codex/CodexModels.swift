@@ -27,12 +27,24 @@ struct GetAccountRateLimitsResponse: Codable {
     let rateLimitResetCredits: RateLimitResetCreditsSummary?
 }
 
-struct GetAccountTokenUsageResponse: Decodable {
+struct GetAccountTokenUsageResponse: Codable {
     let summary: AccountTokenUsageSummary
+    let dailyUsageBuckets: [AccountTokenUsageDailyBucket]?
 }
 
-struct AccountTokenUsageSummary: Decodable {
+struct AccountTokenUsageDailyBucket: Codable, Identifiable {
+    let startDate: String
+    let tokens: Int64
+
+    var id: String { startDate }
+}
+
+struct AccountTokenUsageSummary: Codable {
     let lifetimeTokens: Int64?
+    let peakDailyTokens: Int64?
+    let currentStreakDays: Int64?
+    let longestStreakDays: Int64?
+    let longestRunningTurnSec: Int64?
 }
 
 struct RateLimitResetCreditsSummary: Codable {

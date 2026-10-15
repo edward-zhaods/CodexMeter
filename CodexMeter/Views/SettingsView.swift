@@ -4,87 +4,113 @@ struct SettingsView: View {
     @ObservedObject var appState: AppState
 
     var body: some View {
-        VStack(spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                infoBlock(title: "最后同步", value: lastSyncText)
+        RetroCard(
+            fill: MeterTheme.panel,
+            cornerRadius: 15,
+            shadowOffset: CGSize(width: 4, height: 6)
+        ) {
+            VStack(spacing: 11) {
+                HStack(alignment: .center, spacing: 10) {
+                    infoBlock(title: "最后同步", value: lastSyncText)
 
-                Spacer()
+                    Spacer(minLength: 8)
 
-                Button {
-                    Task {
-                        await appState.refresh()
+                    Toggle("低额度通知", isOn: $appState.lowQuotaNotificationsEnabled)
+                        .toggleStyle(.checkbox)
+                        .tint(MeterTheme.coral)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(MeterTheme.ink)
+
+                    Button {
+                        Task {
+                            await appState.refresh()
+                        }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
                     }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .buttonStyle(.plain)
-                .frame(width: 34, height: 34)
-                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-                .help("刷新")
-            }
-
-            HStack(spacing: 12) {
-                Toggle(isOn: $appState.lowQuotaNotificationsEnabled) {
-                    Label("低额度通知", systemImage: "bell.badge")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .toggleStyle(.checkbox)
-
-                Spacer()
-
-                Button("重连") {
-                    Task {
-                        await appState.reconnect()
-                    }
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true))
+                    .help("刷新")
                 }
 
-                Button("退出") {
-                    NSApplication.shared.terminate(nil)
-                }
-            }
+                Rectangle()
+                    .fill(MeterTheme.ink.opacity(0.16))
+                    .frame(height: 1)
 
-            HStack(spacing: 12) {
-                Label("悬浮样式", systemImage: "circle.dashed")
-                    .font(.system(size: 13, weight: .medium))
+                HStack(spacing: 9) {
+                    Text("悬浮样式")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .tracking(0.7)
+                        .foregroundStyle(MeterTheme.mutedInk)
 
-                Spacer()
-
-                Picker("悬浮样式", selection: $appState.floatingDisplayStyle) {
-                    ForEach(FloatingDisplayStyle.allCases) { style in
-                        Text(style.title).tag(style)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 148)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    infoBlock(title: "Codex 路径", value: appState.customCodexPath.isEmpty ? "自动查找" : appState.customCodexPath)
                     Spacer()
+
+                    HStack(spacing: 5) {
+                        ForEach(FloatingDisplayStyle.allCases) { style in
+                            Button(style.title) {
+                                appState.floatingDisplayStyle = style
+                            }
+                            .buttonStyle(
+                                RetroButtonStyle(
+                                    fill: appState.floatingDisplayStyle == style
+                                        ? MeterTheme.pink
+                                        : MeterTheme.paper,
+                                    compact: true
+                                )
+                            )
+                        }
+                    }
+                }
+
+                HStack(alignment: .center, spacing: 8) {
+                    infoBlock(
+                        title: "Codex 路径",
+                        value: appState.customCodexPath.isEmpty ? "自动查找" : appState.customCodexPath
+                    )
+
+                    Spacer(minLength: 6)
+
                     Button("选择") {
                         appState.chooseCodexExecutable()
                     }
+                    .buttonStyle(RetroButtonStyle(compact: true))
+
                     Button("重置") {
                         appState.clearCustomCodexPath()
                     }
+                    .buttonStyle(RetroButtonStyle(compact: true))
                     .disabled(appState.customCodexPath.isEmpty)
                 }
+
+                HStack(spacing: 7) {
+                    Spacer()
+
+                    Button("重连") {
+                        Task {
+                            await appState.reconnect()
+                        }
+                    }
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.blue, compact: true))
+
+                    Button("退出") {
+                        NSApplication.shared.terminate(nil)
+                    }
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true))
+                }
             }
+            .padding(14)
         }
-        .font(.system(size: 13))
     }
 
     private func infoBlock(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title.uppercased())
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .tracking(0.6)
+                .foregroundStyle(MeterTheme.mutedInk)
+
             Text(value)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(MeterTheme.ink)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }

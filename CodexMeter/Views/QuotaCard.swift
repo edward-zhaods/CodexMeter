@@ -4,78 +4,72 @@ struct QuotaCard: View {
     let window: QuotaWindowViewModel
     let isPrimary: Bool
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(window.title)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    Text(window.resetLineText)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
+    private var filledSegments: Int {
+        Int(ceil(window.remainingPercent / 10))
+    }
 
-                Spacer()
+    var body: some View {
+        RetroCard(fill: MeterTheme.fill(for: window.kind)) {
+            VStack(alignment: .leading, spacing: 7) {
+                Text(window.title.uppercased())
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .tracking(0.7)
+                    .foregroundStyle(MeterTheme.mutedInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
 
                 Text(window.remainingPercentText)
-                    .font(.system(size: isPrimary ? 28 : 22, weight: .bold, design: .rounded))
+                    .font(.system(size: isPrimary ? 29 : 27, weight: .black, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(accentColor)
-            }
+                    .foregroundStyle(MeterTheme.ink)
+                    .lineLimit(1)
 
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.primary.opacity(0.09))
-                    Capsule()
-                        .fill(accentColor)
-                        .frame(width: max(8, proxy.size.width * CGFloat(window.remainingPercent / 100)))
+                segmentedProgress
+
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(MeterTheme.healthColor(for: window.healthLevel))
+                        .frame(width: 7, height: 7)
+                        .overlay(Circle().stroke(MeterTheme.ink, lineWidth: 0.9))
+
+                    Text(healthText)
+                        .fontWeight(.bold)
+
+                    Spacer(minLength: 2)
+
+                    Text("用 \(window.usedPercentText)")
+                        .lineLimit(1)
                 }
-            }
-            .frame(height: isPrimary ? 10 : 8)
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundStyle(MeterTheme.ink)
 
-            HStack(spacing: 10) {
-                metric(label: "已使用", value: window.usedPercentText)
-                Divider()
-                    .frame(height: 16)
-                metric(label: "剩余", value: window.remainingPercentText)
-                Spacer()
-                healthBadge
+                Text(window.resetLineText)
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(MeterTheme.mutedInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
+            .padding(13)
+            .frame(maxWidth: .infinity, minHeight: 126, alignment: .leading)
         }
-        .padding(16)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(borderColor, lineWidth: 1)
-        )
     }
 
-    private func metric(label: String, value: String) -> some View {
-        HStack(spacing: 4) {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .fontWeight(.semibold)
-                .monospacedDigit()
-                .foregroundStyle(.primary)
+    private var segmentedProgress: some View {
+        HStack(spacing: 2.5) {
+            ForEach(0..<10, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                    .fill(index < filledSegments ? MeterTheme.coral : MeterTheme.idleBlock.opacity(0.72))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                            .stroke(
+                                index < filledSegments ? MeterTheme.ink : Color.clear,
+                                lineWidth: 0.8
+                            )
+                    )
+                    .frame(maxWidth: .infinity)
+            }
         }
-        .font(.system(size: 12))
-    }
-
-    private var healthBadge: some View {
-        HStack(spacing: 5) {
-            Circle()
-                .fill(accentColor)
-                .frame(width: 7, height: 7)
-            Text(healthText)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(accentColor)
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .background(accentColor.opacity(0.12), in: Capsule())
+        .frame(height: 9)
     }
 
     private var healthText: String {
@@ -87,27 +81,5 @@ struct QuotaCard: View {
         case .danger:
             return "偏低"
         }
-    }
-
-    private var accentColor: Color {
-        switch window.healthLevel {
-        case .good:
-            return Color(red: 0.08, green: 0.68, blue: 0.32)
-        case .warning:
-            return Color(red: 0.86, green: 0.58, blue: 0.02)
-        case .danger:
-            return Color(red: 0.9, green: 0.18, blue: 0.2)
-        }
-    }
-
-    private var cardBackground: Color {
-        if isPrimary {
-            return accentColor.opacity(0.08)
-        }
-        return Color(nsColor: .controlBackgroundColor)
-    }
-
-    private var borderColor: Color {
-        isPrimary ? accentColor.opacity(0.24) : Color.primary.opacity(0.08)
     }
 }

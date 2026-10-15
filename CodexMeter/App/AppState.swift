@@ -2,6 +2,27 @@ import AppKit
 import Combine
 import Foundation
 
+private enum FloatingQuotaPalette {
+    static let high = NSColor(
+        calibratedRed: 0.59,
+        green: 0.81,
+        blue: 0.94,
+        alpha: 1
+    )
+    static let medium = NSColor(
+        calibratedRed: 1,
+        green: 0.84,
+        blue: 0.29,
+        alpha: 1
+    )
+    static let low = NSColor(
+        calibratedRed: 0.96,
+        green: 0.66,
+        blue: 0.76,
+        alpha: 1
+    )
+}
+
 enum FloatingDisplayStyle: String, CaseIterable, Identifiable {
     case detailed
     case circular
@@ -28,6 +49,8 @@ final class AppState: ObservableObject {
     @Published private(set) var lastSyncDate: Date?
     @Published private(set) var isCachedDataStale = false
     @Published private(set) var lifetimeTokenCount: Int64?
+    @Published private(set) var tokenUsageDailyBuckets: [AccountTokenUsageDailyBucket] = []
+    @Published private(set) var tokenUsageSummary: AccountTokenUsageSummary?
     @Published var customCodexPath: String {
         didSet {
             UserDefaults.standard.set(customCodexPath, forKey: DefaultsKeys.customCodexPath)
@@ -63,6 +86,7 @@ final class AppState: ObservableObject {
         ) as? NSNumber {
             lifetimeTokenCount = cachedTokenCount.int64Value
         }
+        restoreCachedTokenUsage()
         restoreCachedSnapshot()
         observeRateLimitUpdates()
     }
@@ -137,13 +161,13 @@ final class AppState: ObservableObject {
             return .systemGray
         }
 
-        if percent >= 66 {
-            return .systemGreen
+        if percent >= 60 {
+            return FloatingQuotaPalette.high
         }
-        if percent >= 33 {
-            return .systemYellow
+        if percent >= 30 {
+            return FloatingQuotaPalette.medium
         }
-        return .systemRed
+        return FloatingQuotaPalette.low
     }
 
     var statusText: String {
@@ -319,10 +343,9 @@ final class AppState: ObservableObject {
             params: Optional<EmptyParams>.none
         )
         applyRateLimits(response)
-        if let tokenCount = tokenUsage?.summary.lifetimeTokens {
-            let normalizedTokenCount = max(0, tokenCount)
-            lifetimeTokenCount = normalizedTokenCount
-            UserDefaults.standard.set(normalizedTokenCount, forKey: DefaultsKeys.lifetimeTokenCount)
+        if let tokenUsage {
+            applyTokenUsage(tokenUsage)
+            cacheTokenUsage(tokenUsage)
         }
         connectionStatus = .online
         isCachedDataStale = false
@@ -408,6 +431,39 @@ final class AppState: ObservableObject {
         UserDefaults.standard.set(Date(), forKey: DefaultsKeys.cachedSnapshotDate)
     }
 
+    private func applyTokenUsage(_ response: GetAccountTokenUsageResponse) {
+        tokenUsageSummary = response.summary
+        tokenUsageDailyBuckets = (response.dailyUsageBuckets ?? [])
+            .map {
+                AccountTokenUsageDailyBucket(
+                    startDate: $0.startDate,
+                    tokens: max(0, $0.tokens)
+                )
+            }
+            .sorted { $0.startDate < $1.startDate }
+
+        if let tokenCount = response.summary.lifetimeTokens {
+            let normalizedTokenCount = max(0, tokenCount)
+            lifetimeTokenCount = normalizedTokenCount
+            UserDefaults.standard.set(normalizedTokenCount, forKey: DefaultsKeys.lifetimeTokenCount)
+        }
+    }
+
+    private func cacheTokenUsage(_ response: GetAccountTokenUsageResponse) {
+        guard let data = try? JSONEncoder().encode(response) else { return }
+        UserDefaults.standard.set(data, forKey: DefaultsKeys.cachedTokenUsage)
+    }
+
+    private func restoreCachedTokenUsage() {
+        guard
+            let data = UserDefaults.standard.data(forKey: DefaultsKeys.cachedTokenUsage),
+            let response = try? JSONDecoder().decode(GetAccountTokenUsageResponse.self, from: data)
+        else {
+            return
+        }
+        applyTokenUsage(response)
+    }
+
     private func restoreCachedSnapshot() {
         guard
             let data = UserDefaults.standard.data(forKey: DefaultsKeys.cachedSnapshot),
@@ -434,4 +490,5 @@ private enum DefaultsKeys {
     static let cachedSnapshot = "cachedSnapshot"
     static let cachedSnapshotDate = "cachedSnapshotDate"
     static let lifetimeTokenCount = "lifetimeTokenCount"
+    static let cachedTokenUsage = "cachedTokenUsage"
 }

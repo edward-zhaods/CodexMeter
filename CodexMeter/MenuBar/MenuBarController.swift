@@ -14,7 +14,7 @@ final class MenuBarController: NSObject {
 
     init(appState: AppState) {
         self.appState = appState
-        statusItem = NSStatusBar.system.statusItem(withLength: 54)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         configureStatusItem()
         configurePopover()
@@ -34,7 +34,7 @@ final class MenuBarController: NSObject {
 
     private func configurePopover() {
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 430, height: 520)
+        popover.contentSize = NSSize(width: 460, height: 620)
         popover.contentViewController = NSHostingController(
             rootView: MeterPopoverView(appState: appState)
         )
@@ -78,7 +78,7 @@ final class MenuBarController: NSObject {
         panel.hasShadow = true
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = true
+        panel.isMovableByWindowBackground = false
 
         let view = FloatingStatusView(frame: NSRect(x: 0, y: 0, width: 320, height: 40))
         view.autoresizingMask = [.width, .height]
@@ -119,7 +119,7 @@ final class MenuBarController: NSObject {
             + resetWidth
             + 14
         let targetSize = appState.floatingDisplayStyle == .circular
-            ? NSSize(width: 90, height: 90)
+            ? NSSize(width: 98, height: 98)
             : NSSize(width: detailedWidth, height: 40)
 
         if let panel = floatingPanel,
@@ -218,12 +218,20 @@ final class MenuBarController: NSObject {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 430, height: 560),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 640),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Codex Meter"
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        window.backgroundColor = NSColor(
+            calibratedRed: 0.996,
+            green: 0.958,
+            blue: 0.866,
+            alpha: 1
+        )
         window.center()
         window.isReleasedWhenClosed = false
         window.contentViewController = NSHostingController(rootView: MeterPopoverView(appState: appState))
@@ -249,6 +257,8 @@ final class FloatingStatusView: NSView {
 
     private let materialView = NSVisualEffectView()
     private let circularGraphicView = NSView()
+    private let retroBaseLayer = CAShapeLayer()
+    private let retroDotLayer = CAShapeLayer()
     private let dotView = NSView()
     private let nameLabel = NSTextField(labelWithString: "Codex")
     private let firstSeparatorLabel = NSTextField(labelWithString: "·")
@@ -268,6 +278,18 @@ final class FloatingStatusView: NSView {
     private let circularPercentLabel = NSTextField(labelWithString: "")
     private let circularTitleLabel = NSTextField(labelWithString: "已用 --")
     private let circularResetLabel = NSTextField(labelWithString: "")
+    private let retroInkColor = NSColor(
+        calibratedRed: 0.132,
+        green: 0.112,
+        blue: 0.094,
+        alpha: 1
+    )
+    private let retroPaperColor = NSColor(
+        calibratedRed: 0.996,
+        green: 0.958,
+        blue: 0.866,
+        alpha: 1
+    )
     private var displayStyle: FloatingDisplayStyle = .detailed
     private var circularAccentColor: NSColor = .systemGray
     private var ringProgress: CGFloat = 0
@@ -296,6 +318,10 @@ final class FloatingStatusView: NSView {
         layer?.shadowOpacity = 0.12
         layer?.shadowRadius = 5
         layer?.shadowOffset = NSSize(width: 0, height: 2)
+
+        retroBaseLayer.fillColor = retroPaperColor.cgColor
+        retroBaseLayer.isHidden = true
+        layer?.addSublayer(retroBaseLayer)
 
         materialView.material = .popover
         materialView.blendingMode = .withinWindow
@@ -351,6 +377,9 @@ final class FloatingStatusView: NSView {
         waterLayer.addSublayer(frontWaveGradientLayer)
         borderGradientLayer.mask = borderMaskLayer
         circularGraphicView.layer?.addSublayer(waterLayer)
+        retroDotLayer.fillColor = retroInkColor.withAlphaComponent(0.09).cgColor
+        retroDotLayer.isHidden = true
+        circularGraphicView.layer?.addSublayer(retroDotLayer)
         circularGraphicView.layer?.addSublayer(ringTrackLayer)
         circularGraphicView.layer?.addSublayer(ringProgressLayer)
         circularGraphicView.layer?.addSublayer(borderGradientLayer)
@@ -359,13 +388,13 @@ final class FloatingStatusView: NSView {
             gradientLayer.startPoint = CGPoint(x: 0, y: 1)
             gradientLayer.endPoint = CGPoint(x: 1, y: 0)
         }
-        backWaveGradientLayer.opacity = 0.58
-        frontWaveGradientLayer.opacity = 0.76
+        backWaveGradientLayer.opacity = 0.52
+        frontWaveGradientLayer.opacity = 0.84
         borderMaskLayer.fillColor = NSColor.clear.cgColor
         borderMaskLayer.strokeColor = NSColor.black.cgColor
-        borderMaskLayer.lineWidth = 2
+        borderMaskLayer.lineWidth = 2.6
 
-        circularPercentLabel.font = .monospacedDigitSystemFont(ofSize: 16, weight: .bold)
+        circularPercentLabel.font = .monospacedDigitSystemFont(ofSize: 17, weight: .black)
         circularPercentLabel.alignment = .center
         addSubview(circularPercentLabel)
 
@@ -394,6 +423,7 @@ final class FloatingStatusView: NSView {
         style: FloatingDisplayStyle
     ) {
         displayStyle = style
+        let isCircular = style == .circular
         ringProgress = min(max(progress, 0), 1)
         percentLabel.stringValue = percent
         circularPercentLabel.stringValue = percent
@@ -408,23 +438,57 @@ final class FloatingStatusView: NSView {
         ringTrackLayer.strokeColor = accentColor.withAlphaComponent(0.16).cgColor
         ringProgressLayer.strokeColor = accentColor.cgColor
         ringProgressLayer.strokeEnd = ringProgress
-        let lightAccent = accentColor.blended(withFraction: 0.48, of: .white) ?? accentColor
-        let darkAccent = accentColor.blended(withFraction: 0.2, of: .black) ?? accentColor
-        let gradientColors = [
-            lightAccent.cgColor,
-            accentColor.cgColor,
-            darkAccent.cgColor
-        ]
-        backWaveGradientLayer.colors = gradientColors
-        frontWaveGradientLayer.colors = gradientColors
-        borderGradientLayer.colors = gradientColors
+        if isCircular {
+            let lightAccent = accentColor.blended(withFraction: 0.5, of: .white) ?? accentColor
+            let darkAccent = accentColor.blended(withFraction: 0.18, of: retroInkColor) ?? accentColor
+
+            backWaveGradientLayer.colors = [
+                lightAccent.cgColor,
+                accentColor.cgColor,
+                darkAccent.cgColor
+            ]
+            frontWaveGradientLayer.colors = [
+                lightAccent.cgColor,
+                accentColor.cgColor,
+                darkAccent.cgColor
+            ]
+            borderGradientLayer.colors = [
+                lightAccent.cgColor,
+                accentColor.cgColor,
+                darkAccent.cgColor
+            ]
+            retroDotLayer.fillColor = accentColor.withAlphaComponent(0.13).cgColor
+            backWaveGradientLayer.opacity = 0.56
+            frontWaveGradientLayer.opacity = 0.86
+            backWaveGradientLayer.startPoint = CGPoint(x: 0, y: 1)
+            backWaveGradientLayer.endPoint = CGPoint(x: 1, y: 0)
+            frontWaveGradientLayer.startPoint = CGPoint(x: 0, y: 1)
+            frontWaveGradientLayer.endPoint = CGPoint(x: 1, y: 0)
+        } else {
+            let lightAccent = accentColor.blended(withFraction: 0.48, of: .white) ?? accentColor
+            let darkAccent = accentColor.blended(withFraction: 0.2, of: .black) ?? accentColor
+            let gradientColors = [
+                lightAccent.cgColor,
+                accentColor.cgColor,
+                darkAccent.cgColor
+            ]
+            backWaveGradientLayer.colors = gradientColors
+            frontWaveGradientLayer.colors = gradientColors
+            borderGradientLayer.colors = gradientColors
+            backWaveGradientLayer.opacity = 0.52
+            frontWaveGradientLayer.opacity = 0.84
+            backWaveGradientLayer.startPoint = CGPoint(x: 0, y: 1)
+            backWaveGradientLayer.endPoint = CGPoint(x: 1, y: 0)
+            frontWaveGradientLayer.startPoint = CGPoint(x: 0, y: 1)
+            frontWaveGradientLayer.endPoint = CGPoint(x: 1, y: 0)
+        }
         for gradientLayer in [backWaveGradientLayer, frontWaveGradientLayer, borderGradientLayer] {
             gradientLayer.locations = [0, 0.52, 1]
         }
 
-        let isCircular = style == .circular
-        materialView.blendingMode = isCircular ? .behindWindow : .withinWindow
-        materialView.alphaValue = isCircular ? 0.82 : 1
+        materialView.isHidden = isCircular
+        materialView.blendingMode = .withinWindow
+        materialView.alphaValue = 1
         layer?.backgroundColor = isCircular
             ? NSColor.clear.cgColor
             : NSColor.windowBackgroundColor.withAlphaComponent(0.88).cgColor
@@ -445,13 +509,8 @@ final class FloatingStatusView: NSView {
 
     private func applyCircularTextColors() {
         let accent = circularAccentColor.usingColorSpace(.sRGB) ?? circularAccentColor
-        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-
-        let primaryTarget = isDark ? NSColor.white : NSColor.black
-        let primaryBlend: CGFloat = isDark ? 0.72 : 0.52
-        let secondaryBlend: CGFloat = isDark ? 0.58 : 0.68
-        let primary = accent.blended(withFraction: primaryBlend, of: primaryTarget) ?? primaryTarget
-        let secondary = accent.blended(withFraction: secondaryBlend, of: primaryTarget) ?? primaryTarget
+        let primary = accent.blended(withFraction: 0.52, of: retroInkColor) ?? retroInkColor
+        let secondary = accent.blended(withFraction: 0.62, of: retroInkColor) ?? retroInkColor
 
         circularPercentLabel.textColor = primary
         circularTitleLabel.textColor = secondary
@@ -463,18 +522,23 @@ final class FloatingStatusView: NSView {
         materialView.frame = bounds
 
         if displayStyle == .circular {
+            let faceBounds = circularFaceBounds
             layer?.cornerRadius = bounds.height / 2
-            materialView.frame = bounds.insetBy(dx: 1.5, dy: 1.5)
-            materialView.layer?.cornerRadius = materialView.bounds.height / 2
+
+            retroBaseLayer.frame = bounds
+            retroBaseLayer.path = CGPath(ellipseIn: faceBounds, transform: nil)
+
             circularGraphicView.frame = bounds
+            retroDotLayer.frame = bounds
+            retroDotLayer.path = retroDotPath(in: faceBounds)
             borderGradientLayer.frame = bounds
             borderMaskLayer.frame = bounds
             borderMaskLayer.path = CGPath(
-                ellipseIn: bounds.insetBy(dx: 1.5, dy: 1.5),
+                ellipseIn: faceBounds.insetBy(dx: 1.3, dy: 1.3),
                 transform: nil
             )
 
-            let ringFrame = bounds.insetBy(dx: 8, dy: 8)
+            let ringFrame = faceBounds.insetBy(dx: 8, dy: 8)
             let ringPath = CGPath(ellipseIn: ringFrame, transform: nil)
             ringTrackLayer.frame = bounds
             ringTrackLayer.path = ringPath
@@ -483,23 +547,23 @@ final class FloatingStatusView: NSView {
             updateWavePaths()
 
             let groupHeight = 50.0
-            let groupBottom = floor((bounds.height - groupHeight) / 2)
+            let groupBottom = floor(faceBounds.minY + (faceBounds.height - groupHeight) / 2)
             circularTitleLabel.frame = NSRect(
-                x: 8,
+                x: faceBounds.minX + 8,
                 y: groupBottom,
-                width: bounds.width - 16,
+                width: faceBounds.width - 16,
                 height: 16
             )
             circularResetLabel.frame = NSRect(
-                x: 3,
+                x: faceBounds.minX + 3,
                 y: groupBottom + 16,
-                width: bounds.width - 6,
+                width: faceBounds.width - 6,
                 height: 14
             )
             circularPercentLabel.frame = NSRect(
-                x: 8,
+                x: faceBounds.minX + 8,
                 y: groupBottom + 30,
-                width: bounds.width - 16,
+                width: faceBounds.width - 16,
                 height: 20
             )
             return
@@ -530,6 +594,11 @@ final class FloatingStatusView: NSView {
 
     private func startWaveAnimation() {
         guard waveTimer == nil else { return }
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            wavePhase = 0
+            updateWavePaths()
+            return
+        }
         let timer = Timer(
             timeInterval: 1.0 / 30.0,
             target: self,
@@ -542,7 +611,7 @@ final class FloatingStatusView: NSView {
     }
 
     @objc private func advanceWave(_ timer: Timer) {
-        wavePhase += 0.09
+        wavePhase += 0.085
         updateWavePaths()
     }
 
@@ -554,7 +623,7 @@ final class FloatingStatusView: NSView {
     private func updateWavePaths() {
         guard displayStyle == .circular, !bounds.isEmpty else { return }
 
-        let waterBounds = bounds.insetBy(dx: 1.5, dy: 1.5)
+        let waterBounds = circularFaceBounds.insetBy(dx: 1.5, dy: 1.5)
         waterLayer.frame = bounds
         waterMaskLayer.frame = bounds
         waterMaskLayer.path = CGPath(ellipseIn: waterBounds, transform: nil)
@@ -567,21 +636,64 @@ final class FloatingStatusView: NSView {
         backWaveLayer.path = wavePath(
             in: waterBounds,
             waterLevel: waterLevel,
-            amplitude: 2,
-            phase: wavePhase + .pi
+            amplitude: 4.5,
+            cycles: 2,
+            phase: -wavePhase * 0.62 + .pi / 3
         )
         frontWaveLayer.path = wavePath(
             in: waterBounds,
             waterLevel: waterLevel,
-            amplitude: 2.8,
+            amplitude: 6.5,
+            cycles: 1,
             phase: wavePhase
         )
+    }
+
+    private var circularFaceBounds: CGRect {
+        let diameter = max(0, min(bounds.width - 8, bounds.height - 8))
+        return CGRect(
+            x: bounds.midX - diameter / 2,
+            y: bounds.midY - diameter / 2,
+            width: diameter,
+            height: diameter
+        )
+    }
+
+    private func retroDotPath(in rect: CGRect) -> CGPath {
+        let path = CGMutablePath()
+        let spacing: CGFloat = 11
+        let dotSize: CGFloat = 2.2
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let usableRadius = max(0, rect.width / 2 - 4)
+        var x = rect.minX + 7
+
+        while x <= rect.maxX - 7 {
+            var y = rect.minY + 7
+            while y <= rect.maxY - 7 {
+                let distance = hypot(x - center.x, y - center.y)
+                if distance <= usableRadius {
+                    path.addEllipse(
+                        in: CGRect(
+                            x: x - dotSize / 2,
+                            y: y - dotSize / 2,
+                            width: dotSize,
+                            height: dotSize
+                        )
+                    )
+                }
+                y += spacing
+            }
+            x += spacing
+        }
+
+        return path
     }
 
     private func wavePath(
         in rect: CGRect,
         waterLevel: CGFloat,
         amplitude: CGFloat,
+        cycles: CGFloat,
         phase: CGFloat
     ) -> CGPath {
         let path = CGMutablePath()
@@ -590,9 +702,9 @@ final class FloatingStatusView: NSView {
         var x = rect.minX
         while x <= rect.maxX {
             let progress = (x - rect.minX) / rect.width
-            let y = waterLevel + sin(progress * .pi * 2 + phase) * amplitude
+            let y = waterLevel + sin(progress * .pi * 2 * cycles + phase) * amplitude
             path.addLine(to: CGPoint(x: x, y: y))
-            x += 2
+            x += 1
         }
 
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
@@ -611,6 +723,8 @@ final class FloatingStatusView: NSView {
     }
 
     private func setCircularElementsHidden(_ hidden: Bool) {
+        retroBaseLayer.isHidden = hidden
+        retroDotLayer.isHidden = hidden
         circularGraphicView.isHidden = hidden
         ringTrackLayer.isHidden = hidden
         ringProgressLayer.isHidden = hidden
@@ -638,6 +752,7 @@ final class FloatingStatusView: NSView {
         mouseDownLocation = NSEvent.mouseLocation
         windowStartOrigin = window?.frame.origin
         didDrag = false
+        stopWaveAnimation()
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -650,7 +765,12 @@ final class FloatingStatusView: NSView {
             didDrag = true
         }
 
-        window.setFrameOrigin(NSPoint(x: windowStartOrigin.x + deltaX, y: windowStartOrigin.y + deltaY))
+        let scale = window.screen?.backingScaleFactor ?? 2
+        let targetOrigin = NSPoint(
+            x: ((windowStartOrigin.x + deltaX) * scale).rounded() / scale,
+            y: ((windowStartOrigin.y + deltaY) * scale).rounded() / scale
+        )
+        window.setFrameOrigin(targetOrigin)
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -662,5 +782,8 @@ final class FloatingStatusView: NSView {
         mouseDownLocation = nil
         windowStartOrigin = nil
         didDrag = false
+        if displayStyle == .circular {
+            startWaveAnimation()
+        }
     }
 }
