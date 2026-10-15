@@ -19,6 +19,9 @@
 		0A00000A2C56A0000000000A /* CodexModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00010A2C56A0000000000A /* CodexModels.swift */; };
 		0A00000B2C56A0000000000B /* CountdownFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00010B2C56A0000000000B /* CountdownFormatter.swift */; };
 		0A00000C2C56A0000000000C /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00010C2C56A0000000000C /* NotificationService.swift */; };
+		0A00000F2C56A0000000000F /* ClaudeUsageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00010F2C56A0000000000F /* ClaudeUsageModels.swift */; };
+		0A0000102C56A00000000010 /* ClaudeUsageScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001102C56A00000000010 /* ClaudeUsageScanner.swift */; };
+		0A0000112C56A00000000011 /* ClaudeUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001112C56A00000000011 /* ClaudeUsageView.swift */; };
 		0A00000D2C56A0000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A00010E2C56A0000000000E /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -36,6 +39,9 @@
 		0A00010A2C56A0000000000A /* CodexModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexModels.swift; sourceTree = "<group>"; };
 		0A00010B2C56A0000000000B /* CountdownFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownFormatter.swift; sourceTree = "<group>"; };
 		0A00010C2C56A0000000000C /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		0A00010F2C56A0000000000F /* ClaudeUsageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageModels.swift; sourceTree = "<group>"; };
+		0A0001102C56A00000000010 /* ClaudeUsageScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageScanner.swift; sourceTree = "<group>"; };
+		0A0001112C56A00000000011 /* ClaudeUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageView.swift; sourceTree = "<group>"; };
 		0A00010D2C56A0000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0A00010E2C56A0000000000E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -66,6 +72,7 @@
 				0A0000712C56A00000000071 /* MenuBar */,
 				0A0000722C56A00000000072 /* Views */,
 				0A0000732C56A00000000073 /* Codex */,
+				0A0000752C56A00000000075 /* Claude */,
 				0A0000742C56A00000000074 /* System */,
 				0A00010E2C56A0000000000E /* Assets.xcassets */,
 				0A00010D2C56A0000000000D /* Info.plist */,
@@ -105,6 +112,7 @@
 				0A0001052C56A00000000005 /* MeterPopoverView.swift */,
 				0A0001062C56A00000000006 /* QuotaCard.swift */,
 				0A0001072C56A00000000007 /* SettingsView.swift */,
+				0A0001112C56A00000000011 /* ClaudeUsageView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -126,6 +134,15 @@
 				0A00010C2C56A0000000000C /* NotificationService.swift */,
 			);
 			path = System;
+			sourceTree = "<group>";
+		};
+		0A0000752C56A00000000075 /* Claude */ = {
+			isa = PBXGroup;
+			children = (
+				0A00010F2C56A0000000000F /* ClaudeUsageModels.swift */,
+				0A0001102C56A00000000010 /* ClaudeUsageScanner.swift */,
+			);
+			path = Claude;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -209,6 +226,9 @@
 				0A00000A2C56A0000000000A /* CodexModels.swift in Sources */,
 				0A00000B2C56A0000000000B /* CountdownFormatter.swift in Sources */,
 				0A00000C2C56A0000000000C /* NotificationService.swift in Sources */,
+				0A00000F2C56A0000000000F /* ClaudeUsageModels.swift in Sources */,
+				0A0000102C56A00000000010 /* ClaudeUsageScanner.swift in Sources */,
+				0A0000112C56A00000000011 /* ClaudeUsageView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -51,6 +51,13 @@ final class AppState: ObservableObject {
     @Published private(set) var lifetimeTokenCount: Int64?
     @Published private(set) var tokenUsageDailyBuckets: [AccountTokenUsageDailyBucket] = []
     @Published private(set) var tokenUsageSummary: AccountTokenUsageSummary?
+    @Published private(set) var claudeUsage: ClaudeUsageSnapshot?
+    @Published private(set) var claudeScanState: ClaudeScanState = .idle
+    @Published var selectedProvider: MeterProvider {
+        didSet {
+            UserDefaults.standard.set(selectedProvider.rawValue, forKey: DefaultsKeys.selectedProvider)
+        }
+    }
     @Published var customCodexPath: String {
         didSet {
             UserDefaults.standard.set(customCodexPath, forKey: DefaultsKeys.customCodexPath)
@@ -74,6 +81,9 @@ final class AppState: ObservableObject {
     private var notificationCancellable: AnyCancellable?
     private var lastNotificationResetKey: String?
     private var latestSnapshot: GetAccountRateLimitsResponse?
+    private let claudeScanner = ClaudeUsageScanner()
+    private var claudeRefreshTask: Task<Void, Never>?
+    private var claudeScanInFlight = false
 
     init() {
         customCodexPath = UserDefaults.standard.string(forKey: DefaultsKeys.customCodexPath) ?? ""
@@ -81,6 +91,9 @@ final class AppState: ObservableObject {
         floatingDisplayStyle = FloatingDisplayStyle(
             rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.floatingDisplayStyle) ?? ""
         ) ?? .detailed
+        selectedProvider = MeterProvider(
+            rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.selectedProvider) ?? ""
+        ) ?? .codex
         if let cachedTokenCount = UserDefaults.standard.object(
             forKey: DefaultsKeys.lifetimeTokenCount
         ) as? NSNumber {
@@ -203,6 +216,7 @@ final class AppState: ObservableObject {
     func start() async {
         await notificationService.requestAuthorizationIfNeeded()
         startCountdownTicker()
+        startClaudeRefreshLoop()
         await connectAndRefresh()
         startRefreshLoop()
     }
@@ -210,12 +224,16 @@ final class AppState: ObservableObject {
     func stop() {
         refreshTask?.cancel()
         countdownTask?.cancel()
+        claudeRefreshTask?.cancel()
         Task {
             await client?.stop()
         }
     }
 
     func refreshIfNeededForPopover() {
+        Task {
+            await refreshClaudeUsage()
+        }
         guard shouldRefreshForPopover else { return }
         Task {
             await refresh()
@@ -272,6 +290,64 @@ final class AppState: ObservableObject {
         customCodexPath = ""
         Task {
             await reconnect()
+        }
+    }
+
+    // MARK: - Claude Code usage (local transcripts)
+
+    var claudeStatusText: String {
+        switch claudeScanState {
+        case .idle:
+            return "未统计"
+        case .scanning:
+            return "统计中"
+        case .ready:
+            return "已更新"
+        case .failed:
+            return "读取失败"
+        }
+    }
+
+    var claudeStatusColorName: String {
+        switch claudeScanState {
+        case .ready:
+            return "green"
+        case .idle, .scanning:
+            return "orange"
+        case .failed:
+            return "red"
+        }
+    }
+
+    var claudeProjectsDirectoryPath: String {
+        claudeScanner.projectsDirectory.path
+    }
+
+    func refreshClaudeUsage(force: Bool = false) async {
+        if !force, let scannedAt = claudeUsage?.scannedAt, Date().timeIntervalSince(scannedAt) < 60 {
+            return
+        }
+        guard !claudeScanInFlight else { return }
+        claudeScanInFlight = true
+        claudeScanState = .scanning
+        defer { claudeScanInFlight = false }
+
+        do {
+            claudeUsage = try await claudeScanner.scan()
+            claudeScanState = .ready
+        } catch {
+            claudeScanState = .failed(error.localizedDescription)
+        }
+    }
+
+    private func startClaudeRefreshLoop() {
+        claudeRefreshTask?.cancel()
+        claudeRefreshTask = Task { [weak self] in
+            await self?.refreshClaudeUsage(force: true)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                await self?.refreshClaudeUsage(force: true)
+            }
         }
     }
 
@@ -491,4 +567,5 @@ private enum DefaultsKeys {
     static let cachedSnapshotDate = "cachedSnapshotDate"
     static let lifetimeTokenCount = "lifetimeTokenCount"
     static let cachedTokenUsage = "cachedTokenUsage"
+    static let selectedProvider = "meterSelectedProvider"
 }

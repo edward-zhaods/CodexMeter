@@ -1,6 +1,6 @@
 # Codex Meter
 
-Codex Meter 是一个 macOS 菜单栏应用，用来显示 Codex 额度、重置倒计时和账号累计 Token 用量。
+Codex Meter 是一个 macOS 菜单栏应用，用来显示 Codex 额度、重置倒计时和账号累计 Token 用量，并附带一个 Claude 页签，按模型统计本机 Claude Code 的 Token 用量。
 
 ## 功能
 
@@ -10,6 +10,7 @@ Codex Meter 是一个 macOS 菜单栏应用，用来显示 Codex 额度、重置
 - 支持详细条和圆形磨砂悬浮窗
 - 低额度通知、断线重连和本地缓存
 - 根据剩余额度自动切换绿、黄、红状态色
+- Claude 页签：读取本机 `~/.claude/projects` 的会话记录，按模型统计今日 / 7 天 / 30 天 / 累计 Token，并显示每日活动热力图；文件按大小和修改时间缓存，刷新只重读有变化的会话
 
 ## 运行要求
 
@@ -40,6 +41,16 @@ xcodebuild \
 ```text
 build/DerivedData/Build/Products/Release/Codex Meter.app
 ```
+
+## 只有 Command Line Tools 时构建
+
+没有安装 Xcode.app 时，`xcodebuild` 不可用，可以用脚本直接调 `swiftc` 打包：
+
+```bash
+./scripts/build-clt.sh
+```
+
+输出在 `build/clt/Codex Meter.app`。图标资源需要 actool，没有 Xcode 时脚本会复用之前 Xcode 构建产物里的 `Assets.car`。
 
 ## 生成 DMG
 

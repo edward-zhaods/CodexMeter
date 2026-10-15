@@ -165,11 +165,16 @@ private enum TokenActivityPalette {
     }
 }
 
-private struct TokenActivityView: View {
+struct TokenActivityView: View {
     let buckets: [AccountTokenUsageDailyBucket]
     let summary: AccountTokenUsageSummary?
 
     @State private var scope: TokenActivityScope = .daily
+
+    init(buckets: [AccountTokenUsageDailyBucket], summary: AccountTokenUsageSummary?) {
+        self.buckets = buckets
+        self.summary = summary
+    }
 
     private var calendar: Calendar {
         Calendar.autoupdatingCurrent
@@ -567,21 +572,14 @@ struct MeterPopoverView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 15) {
                 header
+                providerSwitch
 
-                if let heroWindow {
-                    hero(window: heroWindow)
-                } else {
-                    emptyHero
+                switch appState.selectedProvider {
+                case .codex:
+                    codexContent
+                case .claude:
+                    ClaudeUsageView(appState: appState)
                 }
-
-                quotaSection
-
-                TokenActivityView(
-                    buckets: appState.tokenUsageDailyBuckets,
-                    summary: appState.tokenUsageSummary
-                )
-
-                SettingsView(appState: appState)
             }
             .padding(.horizontal, 18)
             .padding(.top, 17)
@@ -594,15 +592,74 @@ struct MeterPopoverView: View {
         .environment(\.colorScheme, .light)
     }
 
+    @ViewBuilder
+    private var codexContent: some View {
+        if let heroWindow {
+            hero(window: heroWindow)
+        } else {
+            emptyHero
+        }
+
+        quotaSection
+
+        TokenActivityView(
+            buckets: appState.tokenUsageDailyBuckets,
+            summary: appState.tokenUsageSummary
+        )
+
+        SettingsView(appState: appState)
+    }
+
+    private var providerSwitch: some View {
+        HStack(spacing: 8) {
+            ForEach(MeterProvider.allCases) { provider in
+                Button {
+                    appState.selectedProvider = provider
+                    if provider == .claude {
+                        Task {
+                            await appState.refreshClaudeUsage()
+                        }
+                    }
+                } label: {
+                    Text(provider.title)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(
+                    RetroButtonStyle(
+                        fill: appState.selectedProvider == provider ? MeterTheme.pink : MeterTheme.panel
+                    )
+                )
+            }
+        }
+    }
+
+    private var headerLabel: String {
+        switch appState.selectedProvider {
+        case .codex:
+            return "CODEX METER"
+        case .claude:
+            return "CLAUDE CODE"
+        }
+    }
+
+    private var headerTitle: String {
+        switch appState.selectedProvider {
+        case .codex:
+            return "额度面板"
+        case .claude:
+            return "用量面板"
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("CODEX METER")
+                Text(headerLabel)
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .tracking(2.2)
                     .foregroundStyle(MeterTheme.mutedInk)
 
-                Text("额度面板")
+                Text(headerTitle)
                     .font(.system(size: 23, weight: .black, design: .rounded))
                     .foregroundStyle(MeterTheme.ink)
             }
@@ -808,7 +865,7 @@ struct MeterPopoverView: View {
                 .frame(width: 8, height: 8)
                 .overlay(Circle().stroke(MeterTheme.ink, lineWidth: 1))
 
-            Text(appState.isCachedDataStale ? "缓存" : appState.statusText)
+            Text(statusBadgeText)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(MeterTheme.ink)
                 .lineLimit(1)
@@ -845,8 +902,26 @@ struct MeterPopoverView: View {
         )
     }
 
+    private var statusBadgeText: String {
+        switch appState.selectedProvider {
+        case .codex:
+            return appState.isCachedDataStale ? "缓存" : appState.statusText
+        case .claude:
+            return appState.claudeStatusText
+        }
+    }
+
+    private var statusColorName: String {
+        switch appState.selectedProvider {
+        case .codex:
+            return appState.statusColorName
+        case .claude:
+            return appState.claudeStatusColorName
+        }
+    }
+
     private var statusColor: Color {
-        switch appState.statusColorName {
+        switch statusColorName {
         case "green":
             return MeterTheme.success
         case "orange":
