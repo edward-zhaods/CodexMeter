@@ -377,9 +377,5 @@ private struct ClaudeSettingsCard: View {
 }
 
 private func compactTokens(_ value: Int64) -> String {
-    max(0, value).formatted(
-        .number
-            .notation(.compactName)
-            .precision(.fractionLength(0...1))
-    )
+    compactTokenText(value)
 }

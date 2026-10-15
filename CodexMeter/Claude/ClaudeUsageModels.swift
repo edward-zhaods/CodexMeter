@@ -1,5 +1,13 @@
 import Foundation
 
+func compactTokenText(_ value: Int64) -> String {
+    max(0, value).formatted(
+        .number
+            .notation(.compactName)
+            .precision(.fractionLength(0...1))
+    )
+}
+
 enum MeterProvider: String, CaseIterable, Identifiable, Sendable {
     case codex
     case claude

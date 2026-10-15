@@ -46,7 +46,7 @@ final class MenuBarController: NSObject {
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
                     self?.statusItem.button?.title = self?.visibleMenuTitle ?? "CM"
-                    self?.statusItem.button?.toolTip = "Codex Meter \(self?.appState.compactMenuTitle ?? "")"
+                    self?.statusItem.button?.toolTip = self?.menuToolTip ?? "Codex Meter"
                     self?.updateFloatingButton()
                 }
             }
@@ -54,11 +54,26 @@ final class MenuBarController: NSObject {
     }
 
     private var visibleMenuTitle: String {
-        let compact = appState.compactMenuTitle
+        let compact: String
+        switch appState.selectedProvider {
+        case .codex:
+            compact = appState.compactMenuTitle
+        case .claude:
+            compact = appState.claudeCompactMenuTitle
+        }
         if compact.isEmpty || compact == "..." {
             return "CM"
         }
         return compact
+    }
+
+    private var menuToolTip: String {
+        switch appState.selectedProvider {
+        case .codex:
+            return "Codex Meter \(appState.compactMenuTitle)"
+        case .claude:
+            return "Claude \(appState.claudeFloatingSummary)"
+        }
     }
 
     func showFloatingStatus() {
@@ -107,7 +122,7 @@ final class MenuBarController: NSObject {
         let separatorFont = NSFont.systemFont(ofSize: 12, weight: .regular)
         let percentWidth = ceil((display.percent as NSString).size(withAttributes: [.font: percentFont]).width) + 2
         let resetWidth = ceil((display.reset as NSString).size(withAttributes: [.font: resetFont]).width) + 2
-        let nameWidth = ceil(("Codex" as NSString).size(withAttributes: [.font: nameFont]).width) + 2
+        let nameWidth = ceil((display.name as NSString).size(withAttributes: [.font: nameFont]).width) + 2
         let separatorWidth = ceil(("·" as NSString).size(withAttributes: [.font: separatorFont]).width) + 1
         let separatorGap: CGFloat = 2
         let codexPartWidth = 6 + 8 + nameWidth
@@ -144,39 +159,88 @@ final class MenuBarController: NSObject {
         }
 
         floatingView.configure(
+            name: display.name,
             percent: display.percent,
+            circularPercentText: display.circularPercent,
             resetText: display.reset,
             circularResetText: display.circularReset,
             circularUsageText: display.circularUsage,
             progress: display.progress,
             accentColor: display.color,
-            isStale: appState.isCachedDataStale,
+            isStale: appState.selectedProvider == .codex && appState.isCachedDataStale,
             style: appState.floatingDisplayStyle
         )
-        floatingView.toolTip = "Codex \(display.percent) · \(display.reset)"
+        floatingView.toolTip = "\(display.name) \(display.percent) · \(display.reset)"
     }
 
-    private var floatingDisplay: (
+    private typealias FloatingDisplay = (
+        name: String,
         percent: String,
+        circularPercent: String,
         reset: String,
         circularReset: String,
         circularUsage: String,
         progress: CGFloat,
         color: NSColor
-    ) {
+    )
+
+    private var floatingDisplay: FloatingDisplay {
+        switch appState.selectedProvider {
+        case .codex:
+            return codexFloatingDisplay
+        case .claude:
+            return claudeFloatingDisplay
+        }
+    }
+
+    private var codexFloatingDisplay: FloatingDisplay {
         guard let window = appState.fiveHourWindow ?? appState.weeklyWindow else {
-            return ("同步中", "等待额度数据", "同步中", appState.compactLifetimeTokenText, 0, .systemGray)
+            return ("Codex", "同步中", "同步中", "等待额度数据", "同步中", appState.compactLifetimeTokenText, 0, .systemGray)
         }
 
         let circularReset = window.resetDate
             .map { "\(CountdownFormatter.longString(until: $0))重置" }
             ?? "重置时间未知"
         return (
+            "Codex",
+            window.remainingPercentText,
             window.remainingPercentText,
             window.resetLineText,
             circularReset,
             appState.compactLifetimeTokenText,
             CGFloat(window.remainingPercent / 100),
+            appState.floatingQuotaColor
+        )
+    }
+
+    /// Claude has no quota window, so the ball shows today's tokens and fills
+    /// relative to the heaviest day on record.
+    private var claudeFloatingDisplay: FloatingDisplay {
+        guard let usage = appState.claudeUsage else {
+            let failed: Bool
+            if case .failed = appState.claudeScanState {
+                failed = true
+            } else {
+                failed = false
+            }
+            let title = failed ? "读取失败" : "统计中"
+            let detail = failed ? "无法读取本机记录" : "读取本机会话记录"
+            return ("Claude", title, title, detail, title, "Claude", 0, appState.floatingQuotaColor)
+        }
+
+        let today = usage.totals(in: .today)
+        let week = usage.totals(in: .week)
+        let peak = max(1, usage.activitySummary.peakDailyTokens ?? 1)
+        let todayText = compactTokenText(today.total)
+        let weekText = "7 天 \(compactTokenText(week.total))"
+        return (
+            "Claude",
+            "今日 \(todayText)",
+            todayText,
+            weekText,
+            "今日 · 输出 \(compactTokenText(today.output))",
+            weekText,
+            CGFloat(min(1, Double(today.total) / Double(peak))),
             appState.floatingQuotaColor
         )
     }
@@ -413,7 +477,9 @@ final class FloatingStatusView: NSView {
     }
 
     func configure(
+        name: String,
         percent: String,
+        circularPercentText: String,
         resetText: String,
         circularResetText: String,
         circularUsageText: String,
@@ -425,8 +491,9 @@ final class FloatingStatusView: NSView {
         displayStyle = style
         let isCircular = style == .circular
         ringProgress = min(max(progress, 0), 1)
+        nameLabel.stringValue = name
         percentLabel.stringValue = percent
-        circularPercentLabel.stringValue = percent
+        circularPercentLabel.stringValue = circularPercentText
         resetLabel.stringValue = isStale ? "缓存 · \(resetText)" : resetText
         circularResetLabel.stringValue = isStale ? "缓存 · \(circularResetText)" : circularResetText
         circularTitleLabel.stringValue = circularUsageText

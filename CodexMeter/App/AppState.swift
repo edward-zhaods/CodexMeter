@@ -21,6 +21,12 @@ private enum FloatingQuotaPalette {
         blue: 0.76,
         alpha: 1
     )
+    static let claude = NSColor(
+        calibratedRed: 0.85,
+        green: 0.47,
+        blue: 0.34,
+        alpha: 1
+    )
 }
 
 enum FloatingDisplayStyle: String, CaseIterable, Identifiable {
@@ -170,6 +176,9 @@ final class AppState: ObservableObject {
     }
 
     var floatingQuotaColor: NSColor {
+        if selectedProvider == .claude {
+            return FloatingQuotaPalette.claude
+        }
         guard let percent = (fiveHourWindow ?? weeklyWindow)?.remainingPercent else {
             return .systemGray
         }
@@ -321,6 +330,24 @@ final class AppState: ObservableObject {
 
     var claudeProjectsDirectoryPath: String {
         claudeScanner.projectsDirectory.path
+    }
+
+    /// Menu bar text while the Claude tab is selected: today's token total.
+    var claudeCompactMenuTitle: String {
+        guard let usage = claudeUsage else {
+            if case .failed = claudeScanState {
+                return "失败"
+            }
+            return ""
+        }
+        return compactTokenText(usage.totals(in: .today).total)
+    }
+
+    var claudeFloatingSummary: String {
+        guard let usage = claudeUsage else { return claudeStatusText }
+        let today = compactTokenText(usage.totals(in: .today).total)
+        let week = compactTokenText(usage.totals(in: .week).total)
+        return "今日 \(today) · 7 天 \(week)"
     }
 
     func refreshClaudeUsage(force: Bool = false) async {
