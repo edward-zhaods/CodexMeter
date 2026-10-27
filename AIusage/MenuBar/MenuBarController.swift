@@ -25,9 +25,9 @@ final class MenuBarController: NSObject {
         guard let button = statusItem.button else { return }
         button.image = nil
         button.imagePosition = .noImage
-        button.title = "CM"
+        button.title = "AI"
         button.font = .systemFont(ofSize: 13, weight: .semibold)
-        button.toolTip = "Codex Meter"
+        button.toolTip = "AIusage"
         button.target = self
         button.action = #selector(togglePopover(_:))
     }
@@ -45,8 +45,8 @@ final class MenuBarController: NSObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
-                    self?.statusItem.button?.title = self?.visibleMenuTitle ?? "CM"
-                    self?.statusItem.button?.toolTip = self?.menuToolTip ?? "Codex Meter"
+                    self?.statusItem.button?.title = self?.visibleMenuTitle ?? "AI"
+                    self?.statusItem.button?.toolTip = self?.menuToolTip ?? "AIusage"
                     self?.updateFloatingButton()
                 }
             }
@@ -60,9 +60,11 @@ final class MenuBarController: NSObject {
             compact = appState.compactMenuTitle
         case .claude:
             compact = appState.claudeCompactMenuTitle
+        case .cursor:
+            compact = appState.cursorCompactMenuTitle
         }
         if compact.isEmpty || compact == "..." {
-            return "CM"
+            return "AI"
         }
         return compact
     }
@@ -70,9 +72,11 @@ final class MenuBarController: NSObject {
     private var menuToolTip: String {
         switch appState.selectedProvider {
         case .codex:
-            return "Codex Meter \(appState.compactMenuTitle)"
+            return "Codex \(appState.compactMenuTitle)"
         case .claude:
             return "Claude \(appState.claudeFloatingSummary)"
+        case .cursor:
+            return "Cursor \(appState.cursorFloatingSummary)"
         }
     }
 
@@ -190,6 +194,8 @@ final class MenuBarController: NSObject {
             return codexFloatingDisplay
         case .claude:
             return claudeFloatingDisplay
+        case .cursor:
+            return cursorFloatingDisplay
         }
     }
 
@@ -245,6 +251,34 @@ final class MenuBarController: NSObject {
         )
     }
 
+    private var cursorFloatingDisplay: FloatingDisplay {
+        guard let usage = appState.cursorUsage else {
+            let failed: Bool
+            if case .failed = appState.cursorSyncState {
+                failed = true
+            } else {
+                failed = false
+            }
+            let title = failed ? "读取失败" : "同步中"
+            let detail = failed ? "无法读取 Cursor 额度" : "读取 Cursor 额度"
+            return ("Cursor", title, title, detail, title, "Cursor", 0, appState.floatingQuotaColor)
+        }
+
+        let plan = usage.plan
+        let cycleTokens = compactTokenText(usage.totals(in: .cycle).total)
+        let countdown = plan.cycleEnd.map { "\(CountdownFormatter.longString(until: $0))重置" } ?? "重置时间未知"
+        return (
+            "Cursor",
+            plan.remainingPercentText,
+            plan.remainingPercentText,
+            plan.cycleEnd.map { "\($0.formatted(date: .abbreviated, time: .shortened)) 重置" } ?? "重置时间未知",
+            countdown,
+            "本周期 \(cycleTokens)",
+            CGFloat(plan.remainingPercent / 100),
+            appState.floatingQuotaColor
+        )
+    }
+
     private func positionFloatingPanel(_ panel: NSPanel) {
         if let saved = UserDefaults.standard.string(forKey: "floatingPanelOrigin") {
             let parts = saved.split(separator: ",").compactMap { Double($0) }
@@ -287,7 +321,7 @@ final class MenuBarController: NSObject {
             backing: .buffered,
             defer: false
         )
-        window.title = "Codex Meter"
+        window.title = "AIusage"
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
         window.backgroundColor = NSColor(

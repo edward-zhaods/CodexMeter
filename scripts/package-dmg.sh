@@ -5,11 +5,11 @@ set -euo pipefail
 project_root="$(cd -- "$(dirname -- "${0:A}")/.." && pwd)"
 derived_data_path="${DERIVED_DATA_PATH:-$project_root/build/DerivedData}"
 dist_dir="${DIST_DIR:-$project_root/dist}"
-app_path="$derived_data_path/Build/Products/Release/Codex Meter.app"
+app_path="$derived_data_path/Build/Products/Release/AIusage.app"
 
 xcodebuild \
-  -project "$project_root/CodexMeter.xcodeproj" \
-  -scheme "Codex Meter" \
+  -project "$project_root/AIusage.xcodeproj" \
+  -scheme AIusage \
   -configuration Release \
   -derivedDataPath "$derived_data_path" \
   build
@@ -27,8 +27,8 @@ fi
 codesign --verify --deep --strict "$app_path"
 
 app_version="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app_path/Contents/Info.plist")"
-dmg_path="$dist_dir/CodexMeter-$app_version.dmg"
-package_tmp="$(mktemp -d "${TMPDIR:-/tmp}/CodexMeterDMG.XXXXXX")"
+dmg_path="$dist_dir/AIusage-$app_version.dmg"
+package_tmp="$(mktemp -d "${TMPDIR:-/tmp}/AIusageDMG.XXXXXX")"
 
 cleanup() {
   if [[ -n "${package_tmp:-}" && -d "$package_tmp" ]]; then
@@ -37,12 +37,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-ditto "$app_path" "$package_tmp/Codex Meter.app"
+ditto "$app_path" "$package_tmp/AIusage.app"
 ln -s /Applications "$package_tmp/Applications"
 mkdir -p "$dist_dir"
 
 hdiutil create \
-  -volname "Codex Meter" \
+  -volname "AIusage" \
   -srcfolder "$package_tmp" \
   -format UDZO \
   -ov \

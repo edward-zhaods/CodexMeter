@@ -37,7 +37,7 @@ actor ClaudeUsageScanner {
             ?? FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Application Support", isDirectory: true)
         return base
-            .appendingPathComponent("Codex Meter", isDirectory: true)
+            .appendingPathComponent("AIusage", isDirectory: true)
             .appendingPathComponent("claude-usage-cache.json")
     }
 

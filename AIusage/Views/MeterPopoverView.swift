@@ -579,6 +579,8 @@ struct MeterPopoverView: View {
                     codexContent
                 case .claude:
                     ClaudeUsageView(appState: appState)
+                case .cursor:
+                    CursorUsageView(appState: appState)
                 }
             }
             .padding(.horizontal, 18)
@@ -620,6 +622,11 @@ struct MeterPopoverView: View {
                             await appState.refreshClaudeUsage()
                         }
                     }
+                    if provider == .cursor {
+                        Task {
+                            await appState.refreshCursorUsage()
+                        }
+                    }
                 } label: {
                     Text(provider.title)
                         .frame(maxWidth: .infinity)
@@ -636,9 +643,11 @@ struct MeterPopoverView: View {
     private var headerLabel: String {
         switch appState.selectedProvider {
         case .codex:
-            return "CODEX METER"
+            return "CODEX"
         case .claude:
             return "CLAUDE CODE"
+        case .cursor:
+            return "CURSOR"
         }
     }
 
@@ -648,6 +657,8 @@ struct MeterPopoverView: View {
             return "额度面板"
         case .claude:
             return "用量面板"
+        case .cursor:
+            return "额度面板"
         }
     }
 
@@ -908,6 +919,8 @@ struct MeterPopoverView: View {
             return appState.isCachedDataStale ? "缓存" : appState.statusText
         case .claude:
             return appState.claudeStatusText
+        case .cursor:
+            return appState.cursorStatusText
         }
     }
 
@@ -917,6 +930,8 @@ struct MeterPopoverView: View {
             return appState.statusColorName
         case .claude:
             return appState.claudeStatusColorName
+        case .cursor:
+            return appState.cursorStatusColorName
         }
     }
 

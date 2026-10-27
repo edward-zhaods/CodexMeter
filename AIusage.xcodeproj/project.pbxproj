@@ -22,11 +22,14 @@
 		0A00000F2C56A0000000000F /* ClaudeUsageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00010F2C56A0000000000F /* ClaudeUsageModels.swift */; };
 		0A0000102C56A00000000010 /* ClaudeUsageScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001102C56A00000000010 /* ClaudeUsageScanner.swift */; };
 		0A0000112C56A00000000011 /* ClaudeUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001112C56A00000000011 /* ClaudeUsageView.swift */; };
+		0A0000122C56A00000000012 /* CursorUsageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001122C56A00000000012 /* CursorUsageModels.swift */; };
+		0A0000132C56A00000000013 /* CursorUsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001132C56A00000000013 /* CursorUsageClient.swift */; };
+		0A0000142C56A00000000014 /* CursorUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001142C56A00000000014 /* CursorUsageView.swift */; };
 		0A00000D2C56A0000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A00010E2C56A0000000000E /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0A0000202C56A00000000020 /* Codex Meter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Codex Meter.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A0000202C56A00000000020 /* AIusage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AIusage.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A0001012C56A00000000001 /* CodexMeterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexMeterApp.swift; sourceTree = "<group>"; };
 		0A0001022C56A00000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		0A0001032C56A00000000003 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -42,6 +45,9 @@
 		0A00010F2C56A0000000000F /* ClaudeUsageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageModels.swift; sourceTree = "<group>"; };
 		0A0001102C56A00000000010 /* ClaudeUsageScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageScanner.swift; sourceTree = "<group>"; };
 		0A0001112C56A00000000011 /* ClaudeUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageView.swift; sourceTree = "<group>"; };
+		0A0001122C56A00000000012 /* CursorUsageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorUsageModels.swift; sourceTree = "<group>"; };
+		0A0001132C56A00000000013 /* CursorUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorUsageClient.swift; sourceTree = "<group>"; };
+		0A0001142C56A00000000014 /* CursorUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorUsageView.swift; sourceTree = "<group>"; };
 		0A00010D2C56A0000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0A00010E2C56A0000000000E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -60,12 +66,12 @@
 		0A0000402C56A00000000040 = {
 			isa = PBXGroup;
 			children = (
-				0A0000502C56A00000000050 /* CodexMeter */,
+				0A0000502C56A00000000050 /* AIusage */,
 				0A0000602C56A00000000060 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		0A0000502C56A00000000050 /* CodexMeter */ = {
+		0A0000502C56A00000000050 /* AIusage */ = {
 			isa = PBXGroup;
 			children = (
 				0A0000702C56A00000000070 /* App */,
@@ -73,17 +79,18 @@
 				0A0000722C56A00000000072 /* Views */,
 				0A0000732C56A00000000073 /* Codex */,
 				0A0000752C56A00000000075 /* Claude */,
+				0A0000762C56A00000000076 /* Cursor */,
 				0A0000742C56A00000000074 /* System */,
 				0A00010E2C56A0000000000E /* Assets.xcassets */,
 				0A00010D2C56A0000000000D /* Info.plist */,
 			);
-			path = CodexMeter;
+			path = AIusage;
 			sourceTree = "<group>";
 		};
 		0A0000602C56A00000000060 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				0A0000202C56A00000000020 /* Codex Meter.app */,
+				0A0000202C56A00000000020 /* AIusage.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -113,6 +120,7 @@
 				0A0001062C56A00000000006 /* QuotaCard.swift */,
 				0A0001072C56A00000000007 /* SettingsView.swift */,
 				0A0001112C56A00000000011 /* ClaudeUsageView.swift */,
+				0A0001142C56A00000000014 /* CursorUsageView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -145,12 +153,21 @@
 			path = Claude;
 			sourceTree = "<group>";
 		};
+		0A0000762C56A00000000076 /* Cursor */ = {
+			isa = PBXGroup;
+			children = (
+				0A0001122C56A00000000012 /* CursorUsageModels.swift */,
+				0A0001132C56A00000000013 /* CursorUsageClient.swift */,
+			);
+			path = Cursor;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		0A0000802C56A00000000080 /* Codex Meter */ = {
+		0A0000802C56A00000000080 /* AIusage */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 0A0000902C56A00000000090 /* Build configuration list for PBXNativeTarget "Codex Meter" */;
+			buildConfigurationList = 0A0000902C56A00000000090 /* Build configuration list for PBXNativeTarget "AIusage" */;
 			buildPhases = (
 				0A0000812C56A00000000081 /* Sources */,
 				0A0000302C56A00000000030 /* Frameworks */,
@@ -160,9 +177,9 @@
 			);
 			dependencies = (
 			);
-			name = "Codex Meter";
-			productName = "Codex Meter";
-			productReference = 0A0000202C56A00000000020 /* Codex Meter.app */;
+			name = AIusage;
+			productName = AIusage;
+			productReference = 0A0000202C56A00000000020 /* AIusage.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -180,7 +197,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 0A0000B02C56A000000000B0 /* Build configuration list for PBXProject "CodexMeter" */;
+			buildConfigurationList = 0A0000B02C56A000000000B0 /* Build configuration list for PBXProject "AIusage" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -193,7 +210,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				0A0000802C56A00000000080 /* Codex Meter */,
+				0A0000802C56A00000000080 /* AIusage */,
 			);
 		};
 /* End PBXProject section */
@@ -229,6 +246,9 @@
 				0A00000F2C56A0000000000F /* ClaudeUsageModels.swift in Sources */,
 				0A0000102C56A00000000010 /* ClaudeUsageScanner.swift in Sources */,
 				0A0000112C56A00000000011 /* ClaudeUsageView.swift in Sources */,
+				0A0000122C56A00000000012 /* CursorUsageModels.swift in Sources */,
+				0A0000132C56A00000000013 /* CursorUsageClient.swift in Sources */,
+				0A0000142C56A00000000014 /* CursorUsageView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -353,14 +373,14 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = CodexMeter/Info.plist;
+				INFOPLIST_FILE = AIusage/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.edward.CodexMeter;
-				PRODUCT_NAME = "Codex Meter";
+				PRODUCT_NAME = AIusage;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 			};
@@ -375,14 +395,14 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = CodexMeter/Info.plist;
+				INFOPLIST_FILE = AIusage/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.edward.CodexMeter;
-				PRODUCT_NAME = "Codex Meter";
+				PRODUCT_NAME = AIusage;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 			};
@@ -391,7 +411,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		0A0000B02C56A000000000B0 /* Build configuration list for PBXProject "CodexMeter" */ = {
+		0A0000B02C56A000000000B0 /* Build configuration list for PBXProject "AIusage" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				0A0000C02C56A000000000C0 /* Debug */,
@@ -400,7 +420,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		0A0000902C56A00000000090 /* Build configuration list for PBXNativeTarget "Codex Meter" */ = {
+		0A0000902C56A00000000090 /* Build configuration list for PBXNativeTarget "AIusage" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				0A0000D02C56A000000000D0 /* Debug */,

@@ -59,6 +59,8 @@ final class AppState: ObservableObject {
     @Published private(set) var tokenUsageSummary: AccountTokenUsageSummary?
     @Published private(set) var claudeUsage: ClaudeUsageSnapshot?
     @Published private(set) var claudeScanState: ClaudeScanState = .idle
+    @Published private(set) var cursorUsage: CursorUsageSnapshot?
+    @Published private(set) var cursorSyncState: CursorSyncState = .idle
     @Published var selectedProvider: MeterProvider {
         didSet {
             UserDefaults.standard.set(selectedProvider.rawValue, forKey: DefaultsKeys.selectedProvider)
@@ -90,6 +92,9 @@ final class AppState: ObservableObject {
     private let claudeScanner = ClaudeUsageScanner()
     private var claudeRefreshTask: Task<Void, Never>?
     private var claudeScanInFlight = false
+    private let cursorClient = CursorUsageClient()
+    private var cursorRefreshTask: Task<Void, Never>?
+    private var cursorSyncInFlight = false
 
     init() {
         customCodexPath = UserDefaults.standard.string(forKey: DefaultsKeys.customCodexPath) ?? ""
@@ -176,13 +181,23 @@ final class AppState: ObservableObject {
     }
 
     var floatingQuotaColor: NSColor {
-        if selectedProvider == .claude {
+        switch selectedProvider {
+        case .claude:
             return FloatingQuotaPalette.claude
+        case .cursor:
+            guard let percent = cursorUsage?.plan.remainingPercent else {
+                return .systemGray
+            }
+            return quotaColor(remaining: percent)
+        case .codex:
+            guard let percent = (fiveHourWindow ?? weeklyWindow)?.remainingPercent else {
+                return .systemGray
+            }
+            return quotaColor(remaining: percent)
         }
-        guard let percent = (fiveHourWindow ?? weeklyWindow)?.remainingPercent else {
-            return .systemGray
-        }
+    }
 
+    private func quotaColor(remaining percent: Double) -> NSColor {
         if percent >= 60 {
             return FloatingQuotaPalette.high
         }
@@ -226,6 +241,7 @@ final class AppState: ObservableObject {
         await notificationService.requestAuthorizationIfNeeded()
         startCountdownTicker()
         startClaudeRefreshLoop()
+        startCursorRefreshLoop()
         await connectAndRefresh()
         startRefreshLoop()
     }
@@ -234,6 +250,7 @@ final class AppState: ObservableObject {
         refreshTask?.cancel()
         countdownTask?.cancel()
         claudeRefreshTask?.cancel()
+        cursorRefreshTask?.cancel()
         Task {
             await client?.stop()
         }
@@ -242,6 +259,7 @@ final class AppState: ObservableObject {
     func refreshIfNeededForPopover() {
         Task {
             await refreshClaudeUsage()
+            await refreshCursorUsage()
         }
         guard shouldRefreshForPopover else { return }
         Task {
@@ -374,6 +392,79 @@ final class AppState: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(300))
                 await self?.refreshClaudeUsage(force: true)
+            }
+        }
+    }
+
+    // MARK: - Cursor usage
+
+    var cursorStatusText: String {
+        switch cursorSyncState {
+        case .idle:
+            return "未同步"
+        case .syncing:
+            return "同步中"
+        case .ready:
+            return "已更新"
+        case .failed:
+            return "读取失败"
+        }
+    }
+
+    var cursorStatusColorName: String {
+        switch cursorSyncState {
+        case .ready:
+            return "green"
+        case .idle, .syncing:
+            return "orange"
+        case .failed:
+            return "red"
+        }
+    }
+
+    var cursorCompactMenuTitle: String {
+        guard let usage = cursorUsage else {
+            if case .failed = cursorSyncState {
+                return "失败"
+            }
+            return ""
+        }
+        return usage.plan.remainingPercentText
+    }
+
+    var cursorFloatingSummary: String {
+        guard let usage = cursorUsage else { return cursorStatusText }
+        let countdown = usage.plan.cycleEnd.map { CountdownFormatter.shortString(until: $0) } ?? "重置未知"
+        return "剩余 \(usage.plan.remainingPercentText) · \(countdown)"
+    }
+
+    func refreshCursorUsage(force: Bool = false) async {
+        if !force, let fetchedAt = cursorUsage?.fetchedAt, Date().timeIntervalSince(fetchedAt) < 60 {
+            return
+        }
+        guard !cursorSyncInFlight else { return }
+        cursorSyncInFlight = true
+        if cursorUsage == nil {
+            cursorUsage = await cursorClient.loadCachedSnapshot()
+        }
+        cursorSyncState = .syncing
+        defer { cursorSyncInFlight = false }
+
+        do {
+            cursorUsage = try await cursorClient.refresh()
+            cursorSyncState = .ready
+        } catch {
+            cursorSyncState = .failed(error.localizedDescription)
+        }
+    }
+
+    private func startCursorRefreshLoop() {
+        cursorRefreshTask?.cancel()
+        cursorRefreshTask = Task { [weak self] in
+            await self?.refreshCursorUsage(force: true)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                await self?.refreshCursorUsage(force: true)
             }
         }
     }

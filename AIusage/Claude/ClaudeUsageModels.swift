@@ -11,6 +11,7 @@ func compactTokenText(_ value: Int64) -> String {
 enum MeterProvider: String, CaseIterable, Identifiable, Sendable {
     case codex
     case claude
+    case cursor
 
     var id: String { rawValue }
 
@@ -20,6 +21,8 @@ enum MeterProvider: String, CaseIterable, Identifiable, Sendable {
             return "Codex"
         case .claude:
             return "Claude"
+        case .cursor:
+            return "Cursor"
         }
     }
 }

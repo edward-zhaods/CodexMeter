@@ -1,9 +1,9 @@
 #!/bin/zsh
-# Build "Codex Meter.app" with only the Command Line Tools installed (no Xcode.app).
+# Build "AIusage.app" with only the Command Line Tools installed (no Xcode.app).
 #
-#   ./scripts/build-clt.sh                 # release build into build/clt/Codex Meter.app
+#   ./scripts/build-clt.sh
 #   CONFIGURATION=debug ./scripts/build-clt.sh
-#   OUT_DIR=/tmp/cm ./scripts/build-clt.sh
+#   OUT_DIR=/tmp/aiusage ./scripts/build-clt.sh
 #
 # The asset catalog needs actool, which ships with Xcode only. Without Xcode the
 # script reuses the Assets.car / AppIcon.icns compiled by an earlier Xcode build.
@@ -11,11 +11,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 OUT_DIR="${OUT_DIR:-build/clt}"
-APP="$OUT_DIR/Codex Meter.app"
+APP="$OUT_DIR/AIusage.app"
 CONFIGURATION="${CONFIGURATION:-release}"
 ARCH="${ARCH:-$(uname -m)}"
 SDK="$(xcrun --show-sdk-path)"
-PBXPROJ="CodexMeter.xcodeproj/project.pbxproj"
+PBXPROJ="AIusage.xcodeproj/project.pbxproj"
 VERSION="$(grep -m1 'MARKETING_VERSION' "$PBXPROJ" | sed -E 's/.*= *([^;]+);.*/\1/')"
 BUILD_NUMBER="$(grep -m1 'CURRENT_PROJECT_VERSION' "$PBXPROJ" | sed -E 's/.*= *([^;]+);.*/\1/')"
 
@@ -27,30 +27,30 @@ fi
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-SOURCES=(${(f)"$(find CodexMeter -name '*.swift' | sort)"})
+SOURCES=(${(f)"$(find AIusage -name '*.swift' | sort)"})
 swiftc \
   -swift-version 6 \
   -parse-as-library \
   -target "$ARCH-apple-macos14.0" \
   -sdk "$SDK" \
   "${OPT_FLAGS[@]}" \
-  -module-name Codex_Meter \
-  -o "$APP/Contents/MacOS/Codex Meter" \
+  -module-name AIusage \
+  -o "$APP/Contents/MacOS/AIusage" \
   "${SOURCES[@]}"
 
 sed \
-  -e "s/\$(EXECUTABLE_NAME)/Codex Meter/g" \
+  -e "s/\$(EXECUTABLE_NAME)/AIusage/g" \
   -e "s/\$(PRODUCT_BUNDLE_IDENTIFIER)/com.edward.CodexMeter/g" \
   -e "s/\$(DEVELOPMENT_LANGUAGE)/en/g" \
   -e "s/\$(MARKETING_VERSION)/$VERSION/g" \
   -e "s/\$(CURRENT_PROJECT_VERSION)/$BUILD_NUMBER/g" \
-  CodexMeter/Info.plist > "$APP/Contents/Info.plist"
+  AIusage/Info.plist > "$APP/Contents/Info.plist"
 plutil -replace CFBundleIconFile -string AppIcon "$APP/Contents/Info.plist"
 plutil -replace CFBundleIconName -string AppIcon "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 if actool --version >/dev/null 2>&1; then
-  actool CodexMeter/Assets.xcassets \
+  actool AIusage/Assets.xcassets \
     --compile "$APP/Contents/Resources" \
     --platform macosx \
     --minimum-deployment-target 14.0 \
@@ -58,8 +58,10 @@ if actool --version >/dev/null 2>&1; then
     --output-partial-info-plist /dev/null >/dev/null
 else
   ICON_SOURCES=(
+    "build/DerivedData/Build/Products/Release/AIusage.app/Contents/Resources"
     "build/DerivedData/Build/Products/Release/Codex Meter.app/Contents/Resources"
-    "Codex Meter.app/Contents/Resources"
+    "AIusage.app/Contents/Resources"
+    "$HOME/Desktop/AIusage.app/Contents/Resources"
     "$HOME/Desktop/Codex Meter.app/Contents/Resources"
   )
   copied=0
