@@ -4,6 +4,9 @@
 #   ./scripts/build-clt.sh
 #   CONFIGURATION=debug ./scripts/build-clt.sh
 #   OUT_DIR=/tmp/agentpals ./scripts/build-clt.sh
+#   INSTALL=0 ./scripts/build-clt.sh
+#
+# INSTALL defaults to 1 and copies the app to /Applications/AgentPals.app.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -36,3 +39,18 @@ cp Info.plist "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 codesign --force --deep --sign - --options runtime "$APP"
 echo "Built $APP ($CONFIGURATION, $ARCH)"
+
+if [[ "${INSTALL:-1}" == "1" ]]; then
+  DEST="/Applications/AgentPals.app"
+  if [[ ! -w "/Applications" ]]; then
+    echo "无法写入 /Applications。把 $APP 拖进「应用程序」文件夹后再双击。" >&2
+    exit 1
+  fi
+  # Quit a copy left over from an earlier build so two menu-bar pets do not stack.
+  killall AgentPals 2>/dev/null || true
+  rm -rf "$DEST"
+  ditto "$APP" "$DEST"
+  xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
+  echo "Installed $DEST"
+  echo "在「应用程序」里双击 AgentPals 打开。点菜单栏小人，选「退出」关闭。"
+fi
