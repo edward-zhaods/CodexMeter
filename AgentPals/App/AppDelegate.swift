@@ -24,9 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var tick = 8
     private var frameTimer: Timer?
     private var displayedKey = ""
-    private var claudeItem: NSMenuItem?
-    private var codexItem: NSMenuItem?
-    private var cursorItem: NSMenuItem?
+    private var statusRows: [PetKind: NSMenuItem] = [:]
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
@@ -81,13 +79,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.autoenablesItems = false
         menu.delegate = self
 
-        claudeItem = statusRow(title: "Claude")
-        codexItem = statusRow(title: "Codex")
-        cursorItem = statusRow(title: "Cursor")
-        for item in [claudeItem, codexItem, cursorItem] {
-            if let item {
-                menu.addItem(item)
-            }
+        for kind in PetKind.allCases {
+            let item = statusRow(title: kind.title)
+            statusRows[kind] = item
+            menu.addItem(item)
         }
         menu.addItem(.separator())
 
@@ -127,9 +122,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func updateMenuTitles() {
-        claudeItem?.title = rowTitle("Claude", working: snapshot.claude)
-        codexItem?.title = rowTitle("Codex", working: snapshot.codex)
-        cursorItem?.title = rowTitle("Cursor", working: snapshot.cursor)
+        for kind in PetKind.allCases {
+            statusRows[kind]?.title = rowTitle(kind.title, working: isWorking(kind))
+        }
+    }
+
+    private func isWorking(_ kind: PetKind) -> Bool {
+        switch kind {
+        case .claude:
+            return snapshot.claude
+        case .codex:
+            return snapshot.codex
+        case .cursor:
+            return snapshot.cursor
+        case .agy:
+            return snapshot.agy
+        }
     }
 
     private func rowTitle(_ name: String, working: Bool) -> String {
@@ -137,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private var tooltip: String {
-        "Claude \(stateWord(snapshot.claude)) · Codex \(stateWord(snapshot.codex)) · Cursor \(stateWord(snapshot.cursor))"
+        PetKind.allCases.map { "\($0.title) \(stateWord(isWorking($0)))" }.joined(separator: " · ")
     }
 
     private func stateWord(_ working: Bool) -> String {
@@ -146,23 +154,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func updateImage(force: Bool) {
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        let key = PixelSprites.cacheKey(
-            claudeWorking: snapshot.claude,
-            codexWorking: snapshot.codex,
-            cursorWorking: snapshot.cursor,
-            tick: tick,
-            reduceMotion: reduceMotion
-        )
+        let working = PetKind.allCases.reduce(into: [PetKind: Bool]()) { flags, kind in
+            flags[kind] = isWorking(kind)
+        }
+        let key = PixelSprites.cacheKey(working: working, tick: tick, reduceMotion: reduceMotion)
         guard force || key != displayedKey else { return }
         displayedKey = key
 
-        let image = PixelSprites.image(
-            claudeWorking: snapshot.claude,
-            codexWorking: snapshot.codex,
-            cursorWorking: snapshot.cursor,
-            tick: tick,
-            reduceMotion: reduceMotion
-        )
+        let image = PixelSprites.image(working: working, tick: tick, reduceMotion: reduceMotion)
         image.isTemplate = false
         statusItem.length = image.size.width
         statusItem.button?.imagePosition = .imageOnly

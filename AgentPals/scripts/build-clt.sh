@@ -24,7 +24,7 @@ fi
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-SOURCES=(${(f)"$(find . -name '*.swift' -not -path './build/*' | sort)"})
+SOURCES=(${(f)"$(find . -name '*.swift' -not -path './build/*' -not -name '*Tests.swift' | sort)"})
 swiftc \
   -swift-version 6 \
   -parse-as-library \

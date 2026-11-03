@@ -4,6 +4,7 @@ enum PetKind: CaseIterable {
     case claude
     case codex
     case cursor
+    case agy
 
     var title: String {
         switch self {
@@ -13,6 +14,8 @@ enum PetKind: CaseIterable {
             return "Codex"
         case .cursor:
             return "Cursor"
+        case .agy:
+            return "Agy"
         }
     }
 }
@@ -28,47 +31,18 @@ enum PixelSprites {
 
     private static var images: [String: NSImage] = [:]
 
-    static func cacheKey(
-        claudeWorking: Bool,
-        codexWorking: Bool,
-        cursorWorking: Bool,
-        tick: Int,
-        reduceMotion: Bool
-    ) -> String {
-        let flags: [PetKind: Bool] = [
-            .claude: claudeWorking,
-            .codex: codexWorking,
-            .cursor: cursorWorking
-        ]
-        return PetKind.allCases.map { kind in
-            poseName(pose(working: flags[kind] ?? false, tick: tick, reduceMotion: reduceMotion))
+    static func cacheKey(working: [PetKind: Bool], tick: Int, reduceMotion: Bool) -> String {
+        PetKind.allCases.map { kind in
+            poseName(pose(working: working[kind] ?? false, tick: tick, reduceMotion: reduceMotion))
         }.joined(separator: "|")
     }
 
-    static func image(
-        claudeWorking: Bool,
-        codexWorking: Bool,
-        cursorWorking: Bool,
-        tick: Int,
-        reduceMotion: Bool
-    ) -> NSImage {
-        let key = cacheKey(
-            claudeWorking: claudeWorking,
-            codexWorking: codexWorking,
-            cursorWorking: cursorWorking,
-            tick: tick,
-            reduceMotion: reduceMotion
-        )
+    static func image(working: [PetKind: Bool], tick: Int, reduceMotion: Bool) -> NSImage {
+        let key = cacheKey(working: working, tick: tick, reduceMotion: reduceMotion)
         if let cached = images[key] {
             return cached
         }
-        let image = draw(
-            claudeWorking: claudeWorking,
-            codexWorking: codexWorking,
-            cursorWorking: cursorWorking,
-            tick: tick,
-            reduceMotion: reduceMotion
-        )
+        let image = draw(working: working, tick: tick, reduceMotion: reduceMotion)
         images[key] = image
         return image
     }
@@ -94,13 +68,7 @@ enum PixelSprites {
         }
     }
 
-    private static func draw(
-        claudeWorking: Bool,
-        codexWorking: Bool,
-        cursorWorking: Bool,
-        tick: Int,
-        reduceMotion: Bool
-    ) -> NSImage {
+    private static func draw(working: [PetKind: Bool], tick: Int, reduceMotion: Bool) -> NSImage {
         let columns = PetKind.allCases.count
         let pointWidth = columns * width + (columns - 1) * gap
         let pointHeight = height
@@ -123,13 +91,8 @@ enum PixelSprites {
         }
         context.interpolationQuality = .none
 
-        let flags: [PetKind: Bool] = [
-            .claude: claudeWorking,
-            .codex: codexWorking,
-            .cursor: cursorWorking
-        ]
         for (index, kind) in PetKind.allCases.enumerated() {
-            let petPose = pose(working: flags[kind] ?? false, tick: tick, reduceMotion: reduceMotion)
+            let petPose = pose(working: working[kind] ?? false, tick: tick, reduceMotion: reduceMotion)
             let originX = index * (width + gap)
             for (y, row) in rows(kind: kind, pose: petPose).enumerated() {
                 for (x, pixel) in row.enumerated() {
@@ -168,6 +131,8 @@ enum PixelSprites {
             pack = (codexIdle, codexBlink, codexWork)
         case .cursor:
             pack = (cursorIdle, cursorBlink, cursorWork)
+        case .agy:
+            pack = (agyIdle, agyBlink, agyWork)
         }
         switch pose {
         case .idle:
@@ -189,6 +154,8 @@ enum PixelSprites {
             palette = codexColors
         case .cursor:
             palette = cursorColors
+        case .agy:
+            palette = agyColors
         }
         return palette[pixel]
     }
@@ -697,4 +664,171 @@ enum PixelSprites {
             "........................",
         ],
     ]
+
+    private static let agyColors: [Character: NSColor] = [
+        "H": rgb(232, 252, 255),
+        "o": rgb(64, 86, 168),
+        "O": rgb(28, 36, 92),
+        "r": rgb(72, 230, 226),
+        "w": rgb(255, 255, 255),
+        "E": rgb(12, 16, 42),
+        "b": rgb(168, 120, 220),
+        "m": rgb(96, 236, 220),
+        "h": rgb(150, 236, 230),
+        "k": rgb(24, 28, 64),
+        "c": rgb(120, 245, 236),
+        "n": rgb(12, 14, 36),
+        "s": rgb(255, 236, 170),
+        "S": rgb(255, 255, 240),
+    ]
+
+    private static let agyIdle: [String] = [
+        "........................",
+        "...................s....",
+        "..................sSs...",
+        "...................s....",
+        "......rrrrr.............",
+        "....rrOOOOOrr...........",
+        "...rrHHoooOOr...........",
+        "...rOwEoowEOOr..........",
+        "...rOEEooEEoOr..........",
+        "...rOoooooooOr...rrr....",
+        "...rbooooooObr...rOr....",
+        "...rOOoooooOOr...rrr....",
+        "....rOOmmmOOr...........",
+        ".....rrOOOrr............",
+        "..hh..rrrr...hh.........",
+        "..hh.........hh.........",
+        "..ckckckckckckck........",
+        "...nnnnnnnnnnnn.........",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+    ]
+
+    private static let agyBlink: [String] = [
+        "........................",
+        "...................s....",
+        "..................sSs...",
+        "...................s....",
+        "......rrrrr.............",
+        "....rrOOOOOrr...........",
+        "...rrHHoooOOr...........",
+        "...rOHoooooOOr..........",
+        "...rOEEooEEoOr..........",
+        "...rOoooooooOr...rrr....",
+        "...rbooooooObr...rOr....",
+        "...rOOoooooOOr...rrr....",
+        "....rOOmmmOOr...........",
+        ".....rrOOOrr............",
+        "..hh..rrrr...hh.........",
+        "..hh.........hh.........",
+        "..ckckckckckckck........",
+        "...nnnnnnnnnnnn.........",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+    ]
+
+    private static let agyWork: [[String]] = [
+        [
+            "...................s....",
+            "..................sSs...",
+            "...................s....",
+            "........................",
+            "......rrrrr.............",
+            "....rrOOOOOrr...........",
+            "...rrHHoooOOr...........",
+            "...rOwEoowEOOr..........",
+            "...rOEEooEEoOr..........",
+            "...rOoooooooOr...rrr....",
+            "...rbooooooObr...rOr....",
+            "...rOOoooooOOr...rrr....",
+            "....rOOmmmOOr...........",
+            ".....rrOOOrr............",
+            "..hh..rrrr...hh.........",
+            "..hh.........hh.........",
+            "..ckckckckckckck........",
+            "...nnnnnnnnnnnn.........",
+            "........................",
+            "........................",
+            "........................",
+            "........................",
+        ],
+        [
+            "........................",
+            "....................s...",
+            "...................sSs..",
+            "....................s...",
+            "......rrrrr.............",
+            "....rrOOOOOrr...........",
+            "...rrHHoooOOr...........",
+            "...rOwEoowEOOr..........",
+            "...rOEEooEEoOr..........",
+            "...rOoooooooOr...rrr....",
+            "...rbooooooObr...rOr....",
+            "...rOOoooooOOr...rrr....",
+            ".hh.rOOmmmOOr...........",
+            ".hh..rrOOOrr............",
+            "......rrrr...hh.........",
+            ".............hh.........",
+            "..ckckckckckckck........",
+            "...nnnnnnnnnnnn.........",
+            "........................",
+            "........................",
+            "........................",
+            "........................",
+        ],
+        [
+            "..................s.....",
+            ".................sSs....",
+            "..................s.....",
+            "........................",
+            "........................",
+            "......rrrrr.............",
+            "....rrOOOOOrr...........",
+            "...rrHHoooOOr...........",
+            "...rOwEoowEOOr..........",
+            "...rOEEooEEoOr..........",
+            "...rOoooooooOr...rrr....",
+            "...rbooooooObr...rOr....",
+            "...rOOoooooOOr...rrr....",
+            "....rOOmmmOOr...........",
+            ".....rrOOOrr............",
+            "..hh..rrrr...hh.........",
+            "..hh.........hh.........",
+            "..ckckckckckckck........",
+            "...nnnnnnnnnnnn.........",
+            "........................",
+            "........................",
+            "........................",
+        ],
+        [
+            "........................",
+            ".....................s..",
+            "....................sSs.",
+            ".....................s..",
+            "......rrrrr.............",
+            "....rrOOOOOrr...........",
+            "...rrHHoooOOr...........",
+            "...rOwEoowEOOr..........",
+            "...rOEEooEEoOr..........",
+            "...rOoooooooOr...rrr....",
+            "...rbooooooObr...rOr....",
+            "...rOOoooooOOr...rrr....",
+            "....rOOmmmOOrhh.........",
+            ".....rrOOOrr.hh.........",
+            "..hh..rrrr..............",
+            "..hh....................",
+            "..ckckckckckckck........",
+            "...nnnnnnnnnnnn.........",
+            "........................",
+            "........................",
+            "........................",
+            "........................",
+        ],
+    ]
+
 }

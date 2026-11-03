@@ -4,6 +4,7 @@ struct ActivitySnapshot: Equatable, Sendable {
     var claude = false
     var codex = false
     var cursor = false
+    var agy = false
 }
 
 /// Turns a transcript tail into "still working". A finished turn is idle immediately.
@@ -45,6 +46,43 @@ enum ActivitySignals {
         let kind = (type?.isEmpty == false ? type : nil) ?? role ?? ""
         return kind != "turn_ended"
     }
+
+    /// Antigravity CLI (`agy`) appends one step per line. A turn is over when the
+    /// last real step is a planner reply with no further tool calls.
+    static func agyIsWorking(tail: String) -> Bool {
+        let steps = jsonObjects(in: tail)
+        guard let last = steps.reversed().first(where: { !agyIsBookkeeping($0) }) else {
+            return true
+        }
+        let status = (last["status"] as? String ?? "").uppercased()
+        if status == "RUNNING" || status == "PENDING" || status == "IN_PROGRESS" {
+            return true
+        }
+        if status == "CANCELLED" || status == "CANCELED" || status == "ABORTED" {
+            return false
+        }
+        let type = (last["type"] as? String ?? "").uppercased()
+        let source = (last["source"] as? String ?? "").uppercased()
+        if source == "USER_EXPLICIT" || type == "USER_INPUT" {
+            return true
+        }
+        if let calls = last["tool_calls"] as? [Any], !calls.isEmpty {
+            return true
+        }
+        if type == "PLANNER_RESPONSE" {
+            return false
+        }
+        return true
+    }
+
+    private static func agyIsBookkeeping(_ step: [String: Any]) -> Bool {
+        let type = (step["type"] as? String ?? "").uppercased()
+        return agyBookkeepingTypes.contains(type)
+    }
+
+    private static let agyBookkeepingTypes: Set<String> = [
+        "CONVERSATION_HISTORY", "CHECKPOINT", "EPHEMERAL_MESSAGE", "SYSTEM_MESSAGE"
+    ]
 
     private static let finishedStops: Set<String> = ["end_turn", "stop_sequence", "stop"]
 
@@ -89,7 +127,7 @@ enum ActivitySignals {
     }
 }
 
-/// Reads the local session files Claude Code, Codex, and Cursor already write.
+/// Reads the local session files Claude Code, Codex, Cursor, and Antigravity CLI already write.
 /// It does not launch those tools, install hooks, or treat a running app-server as work.
 final class ActivityMonitor {
     private let fileManager = FileManager.default
@@ -100,6 +138,7 @@ final class ActivityMonitor {
     private var claudeFiles: [URL] = []
     private var codexFiles: [URL] = []
     private var cursorFiles: [URL] = []
+    private var agyFiles: [URL] = []
 
     func poll(now: Date = Date()) -> ActivitySnapshot {
         if now >= nextDirectoryScan {
@@ -108,6 +147,7 @@ final class ActivityMonitor {
             claudeFiles = recentJSONL(under: Self.claudeProjects, newerThan: cutoff)
             codexFiles = codexRollouts(now: now, newerThan: cutoff)
             cursorFiles = cursorTranscripts(newerThan: cutoff)
+            agyFiles = agyTranscripts(newerThan: cutoff)
         }
 
         composerProbe.refreshIfNeeded(now: now)
@@ -115,7 +155,8 @@ final class ActivityMonitor {
         return ActivitySnapshot(
             claude: anyWorking(claudeFiles, now: now, signal: ActivitySignals.claudeIsWorking),
             codex: anyWorking(codexFiles, now: now, signal: ActivitySignals.codexIsWorking),
-            cursor: composerProbe.isGenerating || cursorTranscript
+            cursor: composerProbe.isGenerating || cursorTranscript,
+            agy: anyWorking(agyFiles, now: now, signal: ActivitySignals.agyIsWorking)
         )
     }
 
@@ -137,6 +178,21 @@ final class ActivityMonitor {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".cursor", isDirectory: true)
             .appendingPathComponent("projects", isDirectory: true)
+    }
+
+    /// `agy` keeps each conversation under `~/.gemini/antigravity-cli/brain/<id>/`.
+    /// `GEMINI_HOME` relocates the `.gemini` parent, the same override the CLI uses.
+    private static var agyBrain: URL {
+        let gemini: URL
+        if let override = ProcessInfo.processInfo.environment["GEMINI_HOME"], !override.isEmpty {
+            gemini = URL(fileURLWithPath: override, isDirectory: true)
+        } else {
+            gemini = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".gemini", isDirectory: true)
+        }
+        return gemini
+            .appendingPathComponent("antigravity-cli", isDirectory: true)
+            .appendingPathComponent("brain", isDirectory: true)
     }
 
     private func anyWorking(
@@ -195,6 +251,26 @@ final class ActivityMonitor {
             guard isDirectory else { continue }
             let transcripts = project.appendingPathComponent("agent-transcripts", isDirectory: true)
             files.append(contentsOf: recentJSONL(under: transcripts, newerThan: cutoff))
+        }
+        return files
+    }
+
+    private func agyTranscripts(newerThan cutoff: Date) -> [URL] {
+        guard let conversations = try? fileManager.contentsOfDirectory(
+            at: Self.agyBrain,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+        var files: [URL] = []
+        for conversation in conversations {
+            let transcript = conversation
+                .appendingPathComponent(".system_generated", isDirectory: true)
+                .appendingPathComponent("logs", isDirectory: true)
+                .appendingPathComponent("transcript.jsonl")
+            guard let modified = modificationDate(of: transcript), modified >= cutoff else { continue }
+            files.append(transcript)
         }
         return files
     }
