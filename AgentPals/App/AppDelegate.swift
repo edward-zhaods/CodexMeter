@@ -1,13 +1,17 @@
 import AppKit
-import SwiftUI
 
 @main
-struct AgentPalsApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-
-    var body: some Scene {
-        Settings {
-            EmptyView()
+enum AgentPalsMain {
+    static func main() {
+        MainActor.assumeIsolated {
+            let application = NSApplication.shared
+            let delegate = AppDelegate()
+            application.delegate = delegate
+            application.setActivationPolicy(.accessory)
+            application.run()
+            // delegate is unowned by NSApplication. A use after run() keeps it
+            // alive for the whole run loop; otherwise the status item vanishes.
+            withExtendedLifetime(delegate) {}
         }
     }
 }
@@ -15,7 +19,7 @@ struct AgentPalsApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let monitor = ActivityMonitor()
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private var statusItem: NSStatusItem!
     private var snapshot = ActivitySnapshot()
     private var tick = 8
     private var frameTimer: Timer?
@@ -24,8 +28,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var codexItem: NSMenuItem?
     private var cursorItem: NSMenuItem?
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // The status bar drops items created before launch finishes.
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.isVisible = true
+        statusItem = item
         configureStatusItem()
 
         let timer = Timer(
@@ -144,7 +156,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             tick: tick,
             reduceMotion: reduceMotion
         )
+        image.isTemplate = false
+        statusItem.length = image.size.width
+        statusItem.button?.imagePosition = .imageOnly
+        statusItem.button?.imageScaling = .scaleProportionallyDown
         statusItem.button?.image = image
+        // The status button turns colored images into a template mask unless
+        // this is set on the image it actually retained.
+        statusItem.button?.image?.isTemplate = false
+        statusItem.isVisible = true
         statusItem.button?.toolTip = tooltip
     }
 

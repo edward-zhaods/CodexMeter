@@ -20,9 +20,12 @@ AgentPals 是一个 macOS 菜单栏应用。状态栏里从左到右一直站着
 
 需要 macOS 14 或更高版本，以及 Swift 命令行工具。
 
+已经在跑的话先关掉，否则菜单栏里留着的是旧进程。
+
 ```bash
+killall AgentPals 2>/dev/null
 ./scripts/build-clt.sh
 open build/clt/AgentPals.app
 ```
 
-应用没有 Dock 图标，启动后看菜单栏。
+应用没有 Dock 图标。三个小人在菜单栏里，排在其他状态图标的左边，大约四个图标那么宽。

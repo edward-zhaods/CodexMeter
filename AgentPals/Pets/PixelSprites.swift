@@ -1,5 +1,4 @@
 import AppKit
-import Darwin
 
 enum PetKind: CaseIterable {
     case claude
@@ -108,25 +107,21 @@ enum PixelSprites {
         let pixelsWide = pointWidth * pixelScale
         let pixelsHigh = pointHeight * pixelScale
         let pointSize = NSSize(width: pointWidth, height: pointHeight)
-        guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: pixelsWide,
-            pixelsHigh: pixelsHigh,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bytesPerRow: pixelsWide * 4,
-            bitsPerPixel: 32
-        ) else {
+        // setColor(atX:y:) on an NSBitmapImageRep leaves the alpha byte at 0,
+        // so the status item keeps its width and draws nothing.
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                data: nil,
+                width: pixelsWide,
+                height: pixelsHigh,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else {
             return NSImage(size: pointSize)
         }
-
-        if let data = rep.bitmapData {
-            memset(data, 0, pixelsHigh * pixelsWide * 4)
-        }
-        rep.size = pointSize
+        context.interpolationQuality = .none
 
         let flags: [PetKind: Bool] = [
             .claude: claudeWorking,
@@ -139,20 +134,29 @@ enum PixelSprites {
             for (y, row) in rows(kind: kind, pose: petPose).enumerated() {
                 for (x, pixel) in row.enumerated() {
                     guard let color = color(kind: kind, pixel: pixel) else { continue }
-                    for yOffset in 0..<pixelScale {
-                        for xOffset in 0..<pixelScale {
-                            let pixelX = (originX + x) * pixelScale + xOffset
-                            let pixelY = y * pixelScale + yOffset
-                            rep.setColor(color, atX: pixelX, y: pixelsHigh - 1 - pixelY)
-                        }
+                    var red: CGFloat = 0
+                    var green: CGFloat = 0
+                    var blue: CGFloat = 0
+                    var alpha: CGFloat = 0
+                    guard color.usingColorSpace(.sRGB)?.getRed(&red, green: &green, blue: &blue, alpha: &alpha) == true else {
+                        continue
                     }
+                    context.setFillColor(red: red, green: green, blue: blue, alpha: alpha)
+                    let pixelX = (originX + x) * pixelScale
+                    let pixelY = (pointHeight - 1 - y) * pixelScale
+                    context.fill(CGRect(x: pixelX, y: pixelY, width: pixelScale, height: pixelScale))
                 }
             }
         }
 
+        guard let cgImage = context.makeImage() else {
+            return NSImage(size: pointSize)
+        }
         let image = NSImage(size: pointSize)
-        image.addRepresentation(rep)
         image.isTemplate = false
+        let rep = NSBitmapImageRep(cgImage: cgImage)
+        rep.size = pointSize
+        image.addRepresentation(rep)
         return image
     }
 
