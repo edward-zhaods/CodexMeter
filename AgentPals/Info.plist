@@ -6,6 +6,8 @@
 	<string>zh-Hans</string>
 	<key>CFBundleExecutable</key>
 	<string>AgentPals</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.edward.AgentPals</string>
 	<key>CFBundleInfoDictionaryVersion</key>

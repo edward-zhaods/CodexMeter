@@ -36,6 +36,7 @@ swiftc \
   "${SOURCES[@]}"
 
 cp Info.plist "$APP/Contents/Info.plist"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 codesign --force --deep --sign - --options runtime "$APP"
 echo "Built $APP ($CONFIGURATION, $ARCH)"
