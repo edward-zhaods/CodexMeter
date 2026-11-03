@@ -13,8 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarController = controller
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            controller.showMeterWindow()
-            controller.showFloatingStatus()
+            controller.showPetsWindow()
         }
 
         Task {

@@ -26,6 +26,9 @@ fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+if [[ -d AIusage/Pets/Art ]]; then
+  cp -R AIusage/Pets/Art "$APP/Contents/Resources/Art"
+fi
 
 SOURCES=(${(f)"$(find AIusage -name '*.swift' | sort)"})
 swiftc \
