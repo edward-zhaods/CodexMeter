@@ -110,12 +110,16 @@ final class ActivityMonitor {
             cursorFiles = cursorTranscripts(newerThan: cutoff)
         }
 
+        composerProbe.refreshIfNeeded(now: now)
+        let cursorTranscript = anyWorking(cursorFiles, now: now, signal: ActivitySignals.cursorIsWorking)
         return ActivitySnapshot(
             claude: anyWorking(claudeFiles, now: now, signal: ActivitySignals.claudeIsWorking),
             codex: anyWorking(codexFiles, now: now, signal: ActivitySignals.codexIsWorking),
-            cursor: anyWorking(cursorFiles, now: now, signal: ActivitySignals.cursorIsWorking)
+            cursor: composerProbe.isGenerating || cursorTranscript
         )
     }
+
+    private let composerProbe = CursorComposerProbe()
 
     private static var claudeProjects: URL {
         FileManager.default.homeDirectoryForCurrentUser
@@ -251,5 +255,109 @@ final class ActivityMonitor {
         } catch {
             return nil
         }
+    }
+}
+
+/// Cursor's agent transcript often stays unchanged for a whole turn, so a fresh
+/// jsonl tail is not enough. The IDE keeps the live state on the composer row.
+private final class CursorComposerProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private let queue = DispatchQueue(label: "agentpals.cursor-composer", qos: .utility)
+    private var inFlight = false
+    private var nextRefresh = Date.distantPast
+    private var generating = false
+
+    var isGenerating: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return generating
+    }
+
+    func refreshIfNeeded(now: Date) {
+        lock.lock()
+        let shouldStart = !inFlight && now >= nextRefresh
+        if shouldStart {
+            inFlight = true
+            nextRefresh = now.addingTimeInterval(2)
+        }
+        lock.unlock()
+        guard shouldStart else { return }
+
+        let database = Self.databaseURL
+        queue.async { [weak self] in
+            let value = Self.query(database: database, now: now)
+            guard let self else { return }
+            self.lock.lock()
+            if let value {
+                self.generating = value
+            }
+            self.inFlight = false
+            self.lock.unlock()
+        }
+    }
+
+    private static var databaseURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Cursor/User/globalStorage/state.vscdb")
+    }
+
+    /// nil means the database could not be read; the previous answer stays put.
+    private static func query(database: URL, now: Date) -> Bool? {
+        var isDirectory = ObjCBool(false)
+        guard FileManager.default.fileExists(atPath: database.path, isDirectory: &isDirectory),
+              !isDirectory.boolValue
+        else {
+            return false
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        let encoded = database.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? database.path
+        process.arguments = [
+            "file:\(encoded)?mode=ro",
+            """
+            PRAGMA busy_timeout=200;
+            SELECT json_extract(CAST(value AS TEXT), '$.lastUpdatedAt')
+            FROM cursorDiskKV
+            WHERE key LIKE 'composerData:%'
+              AND (
+                lower(IFNULL(json_extract(CAST(value AS TEXT), '$.status'), ''))
+                    IN ('generating', 'applying', 'running', 'working')
+                OR json_extract(CAST(value AS TEXT), '$.isGenerating') IN (1, 'true')
+              )
+            ORDER BY json_extract(CAST(value AS TEXT), '$.lastUpdatedAt') DESC
+            LIMIT 10;
+            """
+        ]
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        let text = String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        var lines = text.components(separatedBy: "\n")
+        if lines.last?.isEmpty == true {
+            lines.removeLast()
+        }
+        return lines.contains { ActivitySignals.cursorComposerIsLive(updatedAt: $0, now: now) }
+    }
+}
+
+extension ActivitySignals {
+    /// A composer with no timestamp still counts. One older than two hours is a stuck row.
+    static func cursorComposerIsLive(updatedAt line: String, now: Date) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == "null" {
+            return true
+        }
+        guard let raw = Double(trimmed), raw > 0 else { return false }
+        let seconds = raw > 10_000_000_000 ? raw / 1000 : raw
+        return now.timeIntervalSince1970 - seconds <= 2 * 60 * 60
     }
 }

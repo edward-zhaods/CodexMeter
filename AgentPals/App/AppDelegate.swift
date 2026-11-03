@@ -35,7 +35,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         // The status bar drops items created before launch finishes.
+        // Preferred position is distance from the right edge; a small value
+        // stays with the system icons instead of the notch overflow.
+        let positionKey = "NSStatusItem Preferred Position AgentPals"
+        if UserDefaults.standard.object(forKey: positionKey) == nil {
+            UserDefaults.standard.set(0, forKey: positionKey)
+        }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.autosaveName = "AgentPals"
         item.isVisible = true
         statusItem = item
         configureStatusItem()
