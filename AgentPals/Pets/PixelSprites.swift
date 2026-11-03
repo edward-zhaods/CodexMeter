@@ -15,7 +15,7 @@ enum PetKind: CaseIterable {
         case .agy:
             return "开发B(Gemini)"
         case .codex:
-            return "开发C(Codex)"
+            return "测试(Codex)"
         }
     }
 }
