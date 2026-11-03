@@ -134,14 +134,7 @@ enum PixelSprites {
             for (y, row) in rows(kind: kind, pose: petPose).enumerated() {
                 for (x, pixel) in row.enumerated() {
                     guard let color = color(kind: kind, pixel: pixel) else { continue }
-                    var red: CGFloat = 0
-                    var green: CGFloat = 0
-                    var blue: CGFloat = 0
-                    var alpha: CGFloat = 0
-                    guard color.usingColorSpace(.sRGB)?.getRed(&red, green: &green, blue: &blue, alpha: &alpha) == true else {
-                        continue
-                    }
-                    context.setFillColor(red: red, green: green, blue: blue, alpha: alpha)
+                    context.setFillColor(color.cgColor)
                     let pixelX = (originX + x) * pixelScale
                     let pixelY = (pointHeight - 1 - y) * pixelScale
                     context.fill(CGRect(x: pixelX, y: pixelY, width: pixelScale, height: pixelScale))
