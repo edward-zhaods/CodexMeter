@@ -2,20 +2,20 @@ import AppKit
 
 enum PetKind: CaseIterable {
     case claude
-    case codex
     case cursor
     case agy
+    case codex
 
     var title: String {
         switch self {
         case .claude:
-            return "Claude"
-        case .codex:
-            return "Codex"
+            return "架构师(Claude)"
         case .cursor:
-            return "Cursor"
+            return "开发A(Cursor)"
         case .agy:
-            return "Agy"
+            return "开发B(Gemini)"
+        case .codex:
+            return "开发C(Codex)"
         }
     }
 }

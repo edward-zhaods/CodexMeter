@@ -1,6 +1,6 @@
 # AgentPals
 
-AgentPals 是一个 macOS 菜单栏应用。状态栏里从左到右一直站着四个小人：Claude、Codex、Cursor、Agy。
+AgentPals 是一个 macOS 菜单栏应用。状态栏里从左到右是架构师(Claude)、开发A(Cursor)、开发B(Gemini)、开发C(Codex)。
 
 谁在干活，谁就一直敲键盘。闲着的时候手放下，大约每 4 秒眨一下眼。每个角色有一个只有干活时才动的小道具：Claude 的纸上会多出行，Codex 头顶的绿火花会轮流亮，Cursor 的指针旁边会闪点击痕迹，Agy 头顶的星星会换位置。
 
