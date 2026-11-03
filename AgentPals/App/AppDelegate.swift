@@ -1,16 +1,18 @@
 import AppKit
-
-private let appDelegate = AppDelegate()
+import SwiftUI
 
 @main
-enum AgentPalsMain {
-    static func main() {
-        let app = NSApplication.shared
-        app.delegate = appDelegate
-        app.run()
+struct AgentPalsApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
+    var body: some Scene {
+        Settings {
+            EmptyView()
+        }
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let monitor = ActivityMonitor()
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -77,7 +79,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         statusItem.button?.imagePosition = .imageOnly
         statusItem.button?.imageScaling = .scaleProportionallyDown
-        statusItem.button?.accessibilityLabel = "AgentPals"
         updateMenuTitles()
     }
 
@@ -145,7 +146,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         statusItem.button?.image = image
         statusItem.button?.toolTip = tooltip
-        statusItem.button?.accessibilityValue = tooltip
     }
 
     @objc private func motionOptionsChanged(_ notification: Notification) {

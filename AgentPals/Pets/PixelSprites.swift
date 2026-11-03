@@ -20,6 +20,7 @@ enum PetKind: CaseIterable {
 
 /// 24×22 pixel pets. Working frames are a half-second typing loop.
 /// Idle pets keep their hands down and blink for a quarter second every four seconds.
+@MainActor
 enum PixelSprites {
     static let width = 24
     static let height = 22
