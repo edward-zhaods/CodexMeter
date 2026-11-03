@@ -12,9 +12,9 @@ AgentPals 是一个 macOS 菜单栏应用。状态栏里从左到右一直站着
 
 - Claude Code：`~/.claude/projects` 里的 `.jsonl`，包括子代理。尾巴已经是 `cost-state` 或回合结束，就马上算闲着。
 - Codex：今天和昨天的 `~/.codex/sessions/年/月/日/*.jsonl`。最近的任务事件是 `task_complete` 或 `turn_aborted` 就闲着；还在 `task_started`、工具调用或输出里就干活。
-- Cursor：先看 Cursor 自己记下的会话状态，`generating` 才算干活。会话记录在 `~/.cursor/projects/*/agent-transcripts/**/*.jsonl`，最后一条是 `turn_ended` 就闲着。Cursor 开着本身不算干活。
+- Cursor：本机会话列表两分钟内有更新，或者云端代理的状态还是进行中，就算干活。会话记录在 `~/.cursor/projects/*/agent-transcripts/**/*.jsonl`，最后一条是 `turn_ended` 就闲着。Cursor 开着本身不算干活。
 
-Claude 和 Codex 的文件超过 45 秒没有新内容，也回到闲着。这样一次长思考中间的短暂停顿不会闪回眨眼。Cursor 一轮经常很久不写记录，所以以会话状态为准。
+Claude 和 Codex 的文件超过 45 秒没有新内容，也回到闲着。这样一次长思考中间的短暂停顿不会闪回眨眼。Cursor 一轮经常很久不写记录，所以另看会话列表和云端代理状态。
 
 ## 构建
 

@@ -258,8 +258,8 @@ final class ActivityMonitor {
     }
 }
 
-/// Cursor's agent transcript often stays unchanged for a whole turn, so a fresh
-/// jsonl tail is not enough. The IDE keeps the live state on the composer row.
+/// Transcript files often stay still for a whole Cursor turn. The live signal is
+/// the session list's last update, or a cloud agent whose status is still running.
 private final class CursorComposerProbe: @unchecked Sendable {
     private let lock = NSLock()
     private let queue = DispatchQueue(label: "agentpals.cursor-composer", qos: .utility)
@@ -310,25 +310,72 @@ private final class CursorComposerProbe: @unchecked Sendable {
             return false
         }
 
+        guard let tables = sqlite(
+            database: database,
+            sql: "SELECT name FROM sqlite_master WHERE type = 'table';"
+        ) else {
+            return nil
+        }
+
+        var report = ""
+        var readSomething = false
+        let header = tables.contains("composerHeaders")
+            ? sqlite(database: database, sql: Self.headerSQL)
+            : sqlite(database: database, sql: Self.headerBlobSQL)
+        if let header {
+            report += header
+            if !header.hasSuffix("\n") {
+                report += "\n"
+            }
+            readSomething = true
+        }
+        if let cloud = sqlite(database: database, sql: Self.cloudSQL) {
+            report += cloud
+            readSomething = true
+        }
+        guard readSomething else { return nil }
+        return ActivitySignals.cursorDatabaseReportIsWorking(report, now: now)
+    }
+
+    private static let headerSQL = """
+    PRAGMA busy_timeout=400;
+    SELECT 'h|' || CAST(IFNULL(MAX(lastUpdatedAt), 0) AS TEXT) FROM composerHeaders;
+    """
+
+    private static let headerBlobSQL = """
+    PRAGMA busy_timeout=400;
+    SELECT 'j|' || replace(replace(CAST(value AS TEXT), char(10), ''), char(13), '')
+    FROM ItemTable
+    WHERE key = 'composer.composerHeaders';
+    """
+
+    private static let cloudSQL = """
+    PRAGMA busy_timeout=400;
+    SELECT 'c|' || lower(IFNULL(json_extract(agent.value, '$.status'), ''))
+         || '|' || lower(IFNULL(json_extract(agent.value, '$.workflowStatus'), ''))
+         || '|' || COALESCE(json_extract(agent.value, '$.updatedAt'), json_extract(agent.value, '$.lastUpdatedAt'), '')
+         || '|' || CASE WHEN json_extract(agent.value, '$.archived') IN (1, 'true') THEN 1 ELSE 0 END
+         || '|' || CASE WHEN json_extract(agent.value, '$.killed') IN (1, 'true') THEN 1 ELSE 0 END
+    FROM ItemTable AS row, json_each(CAST(row.value AS TEXT)) AS agent
+    WHERE row.key LIKE 'cloudAgentRepository.agents%'
+      AND json_valid(row.value)
+      AND json_type(CAST(row.value AS TEXT)) IN ('array', 'object');
+    SELECT 'c|' || lower(IFNULL(json_extract(agent.value, '$.status'), ''))
+         || '|' || lower(IFNULL(json_extract(agent.value, '$.workflowStatus'), ''))
+         || '|' || COALESCE(json_extract(agent.value, '$.updatedAt'), json_extract(agent.value, '$.lastUpdatedAt'), '')
+         || '|' || CASE WHEN json_extract(agent.value, '$.archived') IN (1, 'true') THEN 1 ELSE 0 END
+         || '|' || CASE WHEN json_extract(agent.value, '$.killed') IN (1, 'true') THEN 1 ELSE 0 END
+    FROM ItemTable AS row, json_each(CAST(row.value AS TEXT)) AS top, json_each(top.value) AS agent
+    WHERE row.key LIKE 'cloudAgentRepository.agents%'
+      AND json_valid(row.value)
+      AND json_type(top.value) = 'array';
+    """
+
+    private static func sqlite(database: URL, sql: String) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
         let encoded = database.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? database.path
-        process.arguments = [
-            "file:\(encoded)?mode=ro",
-            """
-            PRAGMA busy_timeout=200;
-            SELECT json_extract(CAST(value AS TEXT), '$.lastUpdatedAt')
-            FROM cursorDiskKV
-            WHERE key LIKE 'composerData:%'
-              AND (
-                lower(IFNULL(json_extract(CAST(value AS TEXT), '$.status'), ''))
-                    IN ('generating', 'applying', 'running', 'working')
-                OR json_extract(CAST(value AS TEXT), '$.isGenerating') IN (1, 'true')
-              )
-            ORDER BY json_extract(CAST(value AS TEXT), '$.lastUpdatedAt') DESC
-            LIMIT 10;
-            """
-        ]
+        process.arguments = ["file:\(encoded)?mode=ro", sql]
         let stdout = Pipe()
         let stderr = Pipe()
         process.standardOutput = stdout
@@ -340,24 +387,106 @@ private final class CursorComposerProbe: @unchecked Sendable {
         }
         process.waitUntilExit()
         guard process.terminationStatus == 0 else { return nil }
-        let text = String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        var lines = text.components(separatedBy: "\n")
-        if lines.last?.isEmpty == true {
-            lines.removeLast()
-        }
-        return lines.contains { ActivitySignals.cursorComposerIsLive(updatedAt: $0, now: now) }
+        return String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
     }
 }
 
 extension ActivitySignals {
-    /// A composer with no timestamp still counts. One older than two hours is a stuck row.
-    static func cursorComposerIsLive(updatedAt line: String, now: Date) -> Bool {
-        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty || trimmed == "null" {
-            return true
+    /// Local sessions bump `composerHeaders.lastUpdatedAt` while a turn is open.
+    static let cursorHeaderFreshSeconds: TimeInterval = 120
+    /// A cloud agent can run much longer than a local transcript flush.
+    static let cursorCloudFreshSeconds: TimeInterval = 6 * 60 * 60
+
+    private static let cursorActiveStatuses: Set<String> = [
+        "running", "creating", "active", "generating", "applying", "working",
+        "waiting_for_background_work", "in_progress", "in-progress", "executing", "pending"
+    ]
+
+    static func cursorDatabaseReportIsWorking(_ report: String, now: Date) -> Bool {
+        for line in report.split(separator: "\n", omittingEmptySubsequences: true) {
+            let text = String(line)
+            if text.hasPrefix("h|"), cursorHeaderIsLive(updatedAt: String(text.dropFirst(2)), now: now) {
+                return true
+            }
+            if text.hasPrefix("j|"), cursorHeadersJSONIsLive(String(text.dropFirst(2)), now: now) {
+                return true
+            }
+            if text.hasPrefix("c|") {
+                let parts = text.dropFirst(2).split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+                guard parts.count >= 5 else { continue }
+                if cursorCloudIsLive(
+                    status: parts[0],
+                    workflow: parts[1],
+                    updatedAt: parts[2],
+                    archived: parts[3],
+                    killed: parts[4],
+                    now: now
+                ) {
+                    return true
+                }
+            }
         }
-        guard let raw = Double(trimmed), raw > 0 else { return false }
-        let seconds = raw > 10_000_000_000 ? raw / 1000 : raw
-        return now.timeIntervalSince1970 - seconds <= 2 * 60 * 60
+        return false
+    }
+
+    static func cursorHeaderIsLive(updatedAt line: String, now: Date) -> Bool {
+        cursorTimestampIsRecent(line, now: now, window: cursorHeaderFreshSeconds) == true
+    }
+
+    static func cursorHeadersJSONIsLive(_ json: String, now: Date) -> Bool {
+        guard let regex = try? NSRegularExpression(pattern: #""lastUpdatedAt"\s*:\s*(\d+)"#) else {
+            return false
+        }
+        let range = NSRange(json.startIndex..<json.endIndex, in: json)
+        for match in regex.matches(in: json, range: range) {
+            guard let valueRange = Range(match.range(at: 1), in: json) else { continue }
+            if cursorHeaderIsLive(updatedAt: String(json[valueRange]), now: now) {
+                return true
+            }
+        }
+        return false
+    }
+
+    static func cursorCloudIsLive(
+        status: String,
+        workflow: String,
+        updatedAt: String,
+        archived: String,
+        killed: String,
+        now: Date
+    ) -> Bool {
+        if archived == "1" || killed == "1" {
+            return false
+        }
+        let state = status.lowercased()
+        let flow = workflow.lowercased()
+        guard cursorActiveStatuses.contains(state) || cursorActiveStatuses.contains(flow) else {
+            return false
+        }
+        if let recent = cursorTimestampIsRecent(updatedAt, now: now, window: cursorCloudFreshSeconds) {
+            return recent
+        }
+        return true
+    }
+
+    /// nil when the text is not a timestamp. Numbers may be seconds or milliseconds.
+    static func cursorTimestampIsRecent(_ raw: String, now: Date, window: TimeInterval) -> Bool? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == "null" || trimmed == "0" {
+            return nil
+        }
+        if let number = Double(trimmed), number > 0 {
+            let seconds = number > 10_000_000_000 ? number / 1000 : number
+            return now.timeIntervalSince1970 - seconds <= window
+        }
+        let formatter = ISO8601DateFormatter()
+        if let date = formatter.date(from: trimmed) {
+            return now.timeIntervalSince(date) <= window
+        }
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: trimmed) {
+            return now.timeIntervalSince(date) <= window
+        }
+        return nil
     }
 }
