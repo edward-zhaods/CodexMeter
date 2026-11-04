@@ -44,6 +44,8 @@ struct QuotaCard: View {
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundStyle(MeterTheme.ink)
 
+                Spacer(minLength: 0)
+
                 Text(window.resetLineText)
                     .font(.system(size: 9, weight: .medium, design: .monospaced))
                     .foregroundStyle(MeterTheme.mutedInk)
@@ -51,7 +53,12 @@ struct QuotaCard: View {
                     .minimumScaleFactor(0.7)
             }
             .padding(11)
-            .frame(maxWidth: .infinity, minHeight: MeterPanelMetrics.cardMinHeight, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MeterPanelMetrics.cardMinHeight,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
     }
 

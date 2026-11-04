@@ -53,11 +53,114 @@ enum MeterTheme {
 
 enum MeterPanelMetrics {
     static let width: CGFloat = 880
-    static let height: CGFloat = 640
     static let heroWidth: CGFloat = 340
     static let sideColumnWidth: CGFloat = 360
     static let heroMinHeight: CGFloat = 120
     static let cardMinHeight: CGFloat = 120
+}
+
+@MainActor
+final class MeterPanelSizer: ObservableObject {
+    @Published var maxContentHeight: CGFloat = 860
+    var onContentHeight: ((CGFloat) -> Void)?
+}
+
+private struct PanelContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+struct MeterColumnWidth: LayoutValueKey {
+    static let defaultValue: CGFloat? = nil
+}
+
+extension View {
+    func meterColumn(width: CGFloat) -> some View {
+        layoutValue(key: MeterColumnWidth.self, value: width)
+    }
+}
+
+struct StretchHStack: Layout {
+    var spacing: CGFloat = 10
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let widths = columnWidths(proposal: proposal, subviews: subviews)
+        let height = rowHeight(widths: widths, subviews: subviews)
+        let used = usedWidth(widths)
+        return CGSize(width: max(proposal.width ?? used, used), height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let widths = columnWidths(
+            proposal: ProposedViewSize(width: bounds.width, height: proposal.height),
+            subviews: subviews
+        )
+        var x = bounds.minX
+        for index in subviews.indices {
+            let width = widths[index]
+            subviews[index].place(
+                at: CGPoint(x: x, y: bounds.minY),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: width, height: bounds.height)
+            )
+            x += width + spacing
+        }
+    }
+
+    private func rowHeight(widths: [CGFloat], subviews: Subviews) -> CGFloat {
+        var height: CGFloat = 0
+        for index in subviews.indices {
+            let measured = subviews[index]
+                .sizeThatFits(ProposedViewSize(width: widths[index], height: nil))
+                .height
+            height = max(height, measured)
+        }
+        return height
+    }
+
+    private func usedWidth(_ widths: [CGFloat]) -> CGFloat {
+        guard !widths.isEmpty else { return 0 }
+        return widths.reduce(0, +) + spacing * CGFloat(widths.count - 1)
+    }
+
+    private func columnWidths(proposal: ProposedViewSize, subviews: Subviews) -> [CGFloat] {
+        let count = subviews.count
+        guard count > 0 else { return [] }
+
+        let gaps = spacing * CGFloat(count - 1)
+        let available = max(0, (proposal.width ?? 0) - gaps)
+        var widths = Array(repeating: CGFloat(0), count: count)
+        var flexible: [Int] = []
+        var fixedSum: CGFloat = 0
+
+        for index in subviews.indices {
+            if let fixed = subviews[index][MeterColumnWidth.self] {
+                widths[index] = fixed
+                fixedSum += fixed
+            } else {
+                flexible.append(index)
+            }
+        }
+
+        if proposal.width == nil {
+            for index in flexible {
+                widths[index] = subviews[index]
+                    .sizeThatFits(ProposedViewSize(width: nil, height: nil))
+                    .width
+            }
+            return widths
+        }
+
+        let share = flexible.isEmpty
+            ? CGFloat(0)
+            : max(0, available - fixedSum) / CGFloat(flexible.count)
+        for index in flexible {
+            widths[index] = share
+        }
+        return widths
+    }
 }
 
 func meterSectionHeading(_ title: String, caption: String) -> some View {
@@ -264,6 +367,7 @@ struct TokenActivityView: View {
                 .frame(maxWidth: .infinity, minHeight: 88, alignment: .top)
             }
             .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
@@ -609,38 +713,73 @@ private func activityLevel(tokens: Int64, maximum: Int64) -> Int {
 
 struct MeterPopoverView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject var sizer: MeterPanelSizer
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var contentHeight: CGFloat = 0
 
     private var heroWindow: QuotaWindowViewModel? {
         appState.fiveHourWindow ?? appState.weeklyWindow
     }
 
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                header
-                providerSwitch
+    private var needsScroll: Bool {
+        contentHeight > sizer.maxContentHeight + 1
+    }
 
-                switch appState.selectedProvider {
-                case .codex:
-                    codexContent
-                case .claude:
-                    ClaudeUsageView(appState: appState)
-                case .cursor:
-                    CursorUsageView(appState: appState)
-                case .agy:
-                    AgyUsageView(appState: appState)
+    var body: some View {
+        Group {
+            if needsScroll {
+                ScrollView(.vertical) {
+                    panelStack
                 }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(width: MeterPanelMetrics.width, height: sizer.maxContentHeight, alignment: .top)
+            } else {
+                panelStack
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(width: MeterPanelMetrics.width, height: MeterPanelMetrics.height)
         .background(MeterTheme.paper)
         .environment(\.colorScheme, .dark)
         .environment(\.meterAccent, MeterTheme.accent(for: appState.selectedProvider))
+        .onPreferenceChange(PanelContentHeightKey.self) { height in
+            guard height > 80, abs(height - contentHeight) > 0.5 else { return }
+            contentHeight = height
+            sizer.onContentHeight?(height)
+        }
+    }
+
+    private var panelStack: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header
+            providerSwitch
+            providerPage
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
+        .frame(width: MeterPanelMetrics.width, alignment: .topLeading)
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: PanelContentHeightKey.self,
+                    value: proxy.size.width >= MeterPanelMetrics.width - 1 ? proxy.size.height : 0
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var providerPage: some View {
+        switch appState.selectedProvider {
+        case .codex:
+            codexContent
+        case .claude:
+            ClaudeUsageView(appState: appState)
+        case .cursor:
+            CursorUsageView(appState: appState)
+        case .agy:
+            AgyUsageView(appState: appState)
+        }
     }
 
     @ViewBuilder
@@ -648,18 +787,12 @@ struct MeterPopoverView: View {
         VStack(alignment: .leading, spacing: 8) {
             meterSectionHeading("额度一览", caption: "RATE LIMIT WINDOWS")
 
-            HStack(alignment: .top, spacing: 10) {
-                Group {
-                    if let heroWindow {
-                        hero(window: heroWindow)
-                    } else {
-                        emptyHero
-                    }
-                }
-                .frame(width: MeterPanelMetrics.heroWidth)
-
-                codexCards
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            StretchHStack(spacing: 10) {
+                codexHero
+                    .meterColumn(width: MeterPanelMetrics.heroWidth)
+                fiveHourCard
+                weeklyCard
+                lifetimeTokenCard
             }
 
             ForEach(appState.otherWindows) { window in
@@ -667,15 +800,22 @@ struct MeterPopoverView: View {
             }
         }
 
-        HStack(alignment: .top, spacing: 10) {
+        StretchHStack(spacing: 10) {
             TokenActivityView(
                 buckets: appState.tokenUsageDailyBuckets,
                 summary: appState.tokenUsageSummary
             )
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-
             SettingsView(appState: appState)
-                .frame(width: MeterPanelMetrics.sideColumnWidth, alignment: .topLeading)
+                .meterColumn(width: MeterPanelMetrics.sideColumnWidth)
+        }
+    }
+
+    @ViewBuilder
+    private var codexHero: some View {
+        if let heroWindow {
+            hero(window: heroWindow)
+        } else {
+            emptyHero
         }
     }
 
@@ -796,6 +936,8 @@ struct MeterPopoverView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
 
+                    Spacer(minLength: 0)
+
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(heroResetDateText(for: window))
                             .lineLimit(1)
@@ -810,8 +952,14 @@ struct MeterPopoverView: View {
                     .foregroundStyle(MeterTheme.mutedInk)
                 }
                 .padding(14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, minHeight: MeterPanelMetrics.heroMinHeight, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MeterPanelMetrics.heroMinHeight,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
     }
 
@@ -842,36 +990,36 @@ struct MeterPopoverView: View {
                 }
                 .padding(14)
             }
-            .frame(maxWidth: .infinity, minHeight: MeterPanelMetrics.heroMinHeight, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MeterPanelMetrics.heroMinHeight,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
     }
 
-    private var codexCards: some View {
-        HStack(alignment: .top, spacing: 9) {
-            if let fiveHourWindow = appState.fiveHourWindow {
-                QuotaCard(
-                    window: fiveHourWindow,
-                    isPrimary: fiveHourWindow.id == heroWindow?.id
-                )
-                .frame(maxWidth: .infinity)
-            } else {
-                missingQuotaCard(title: "5 小时额度", fill: MeterTheme.yellow)
-                    .frame(maxWidth: .infinity)
-            }
+    @ViewBuilder
+    private var fiveHourCard: some View {
+        if let fiveHourWindow = appState.fiveHourWindow {
+            QuotaCard(
+                window: fiveHourWindow,
+                isPrimary: fiveHourWindow.id == heroWindow?.id
+            )
+        } else {
+            missingQuotaCard(title: "5 小时额度", fill: MeterTheme.yellow)
+        }
+    }
 
-            if let weeklyWindow = appState.weeklyWindow {
-                QuotaCard(
-                    window: weeklyWindow,
-                    isPrimary: weeklyWindow.id == heroWindow?.id
-                )
-                .frame(maxWidth: .infinity)
-            } else {
-                missingQuotaCard(title: "周额度", fill: MeterTheme.pink)
-                    .frame(maxWidth: .infinity)
-            }
-
-            lifetimeTokenCard
-                .frame(maxWidth: .infinity)
+    @ViewBuilder
+    private var weeklyCard: some View {
+        if let weeklyWindow = appState.weeklyWindow {
+            QuotaCard(
+                window: weeklyWindow,
+                isPrimary: weeklyWindow.id == heroWindow?.id
+            )
+        } else {
+            missingQuotaCard(title: "周额度", fill: MeterTheme.pink)
         }
     }
 
@@ -907,7 +1055,12 @@ struct MeterPopoverView: View {
                 }
             }
             .padding(11)
-            .frame(maxWidth: .infinity, minHeight: MeterPanelMetrics.cardMinHeight, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MeterPanelMetrics.cardMinHeight,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
     }
 
@@ -931,7 +1084,12 @@ struct MeterPopoverView: View {
                     .foregroundStyle(MeterTheme.mutedInk)
             }
             .padding(11)
-            .frame(maxWidth: .infinity, minHeight: MeterPanelMetrics.cardMinHeight, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MeterPanelMetrics.cardMinHeight,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
     }
 

@@ -16,18 +16,19 @@ struct ClaudeUsageView: View {
             emptyHero
         }
 
-        HStack(alignment: .top, spacing: 10) {
+        StretchHStack(spacing: 10) {
             modelSection
-                .frame(maxWidth: .infinity, alignment: .topLeading)
 
             VStack(alignment: .leading, spacing: 10) {
                 TokenActivityView(
                     buckets: snapshot?.dailyBuckets ?? [],
                     summary: snapshot?.activitySummary
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 ClaudeSettingsCard(appState: appState)
             }
-            .frame(width: MeterPanelMetrics.sideColumnWidth, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .meterColumn(width: MeterPanelMetrics.sideColumnWidth)
         }
     }
 
@@ -158,18 +159,24 @@ struct ClaudeUsageView: View {
                 if let snapshot {
                     let models = snapshot.models(in: scope)
                     if models.isEmpty {
+                        Spacer(minLength: 8)
                         placeholder("这个时间段没有 Claude 记录")
+                        Spacer(minLength: 8)
                     } else {
                         let maxTotal = max(1, models.map(\.counters.total).max() ?? 1)
                         modelColumns(models, maxTotal: maxTotal)
 
                         footer(total: snapshot.totals(in: scope), snapshot: snapshot)
+                        Spacer(minLength: 0)
                     }
                 } else {
+                    Spacer(minLength: 8)
                     placeholder("等待统计结果")
+                    Spacer(minLength: 8)
                 }
             }
             .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 

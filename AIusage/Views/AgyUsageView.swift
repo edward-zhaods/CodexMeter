@@ -9,34 +9,23 @@ struct AgyUsageView: View {
 
     var body: some View {
         let groups = displayedGroups
-        if !groups.isEmpty {
-            hero(groups)
-            groupBoard(groups, headlineID: appState.agyUsage?.tightest(in: groups)?.bucket.id)
-        } else {
-            emptyHero
+        VStack(alignment: .leading, spacing: 10) {
+            if !groups.isEmpty {
+                hero(groups)
+                groupBoard(groups, headlineID: appState.agyUsage?.tightest(in: groups)?.bucket.id)
+            } else {
+                emptyHero
+            }
         }
     }
 
-    @ViewBuilder
     private func groupBoard(_ groups: [AgyQuotaGroup], headlineID: String?) -> some View {
-        if groups.count <= 1, let group = groups.first {
-            groupSection(group, headlineID: headlineID)
-        } else {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(stride(from: 0, to: groups.count, by: 2)), id: \.self) { start in
-                    HStack(alignment: .top, spacing: 10) {
-                        groupSection(groups[start], headlineID: headlineID)
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
-                        if start + 1 < groups.count {
-                            groupSection(groups[start + 1], headlineID: headlineID)
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
-                        } else {
-                            Color.clear.frame(maxWidth: .infinity)
-                        }
-                    }
-                }
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(groups) { group in
+                groupSection(group, headlineID: headlineID)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func hero(_ groups: [AgyQuotaGroup]) -> some View {
@@ -95,35 +84,51 @@ struct AgyUsageView: View {
 
             bucketBoard(group.buckets, headlineID: headlineID)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func bucketBoard(_ buckets: [AgyQuotaBucket], headlineID: String?) -> some View {
+        let rowSize = buckets.count > 4 ? 4 : max(buckets.count, 1)
+        return VStack(alignment: .leading, spacing: 9) {
+            ForEach(Array(stride(from: 0, to: buckets.count, by: rowSize)), id: \.self) { start in
+                bucketRow(Array(buckets[start..<min(start + rowSize, buckets.count)]), headlineID: headlineID)
+            }
+        }
     }
 
     @ViewBuilder
-    private func bucketBoard(_ buckets: [AgyQuotaBucket], headlineID: String?) -> some View {
-        if buckets.count <= 3 {
-            HStack(alignment: .top, spacing: 9) {
-                ForEach(buckets) { bucket in
-                    quotaCard(bucket, headlineID: headlineID)
-                }
+    private func bucketRow(_ buckets: [AgyQuotaBucket], headlineID: String?) -> some View {
+        switch buckets.count {
+        case 0:
+            EmptyView()
+        case 1:
+            StretchHStack(spacing: 9) {
+                quotaCard(buckets[0], headlineID: headlineID)
             }
-        } else {
-            VStack(alignment: .leading, spacing: 9) {
-                ForEach(Array(stride(from: 0, to: buckets.count, by: 2)), id: \.self) { start in
-                    HStack(alignment: .top, spacing: 9) {
-                        quotaCard(buckets[start], headlineID: headlineID)
-                        if start + 1 < buckets.count {
-                            quotaCard(buckets[start + 1], headlineID: headlineID)
-                        } else {
-                            Color.clear.frame(maxWidth: .infinity)
-                        }
-                    }
-                }
+        case 2:
+            StretchHStack(spacing: 9) {
+                quotaCard(buckets[0], headlineID: headlineID)
+                quotaCard(buckets[1], headlineID: headlineID)
+            }
+        case 3:
+            StretchHStack(spacing: 9) {
+                quotaCard(buckets[0], headlineID: headlineID)
+                quotaCard(buckets[1], headlineID: headlineID)
+                quotaCard(buckets[2], headlineID: headlineID)
+            }
+        default:
+            StretchHStack(spacing: 9) {
+                quotaCard(buckets[0], headlineID: headlineID)
+                quotaCard(buckets[1], headlineID: headlineID)
+                quotaCard(buckets[2], headlineID: headlineID)
+                quotaCard(buckets[3], headlineID: headlineID)
             }
         }
     }
 
     private func quotaCard(_ bucket: AgyQuotaBucket, headlineID: String?) -> some View {
         QuotaCard(window: bucket.window, isPrimary: bucket.id == headlineID)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var emptyHero: some View {

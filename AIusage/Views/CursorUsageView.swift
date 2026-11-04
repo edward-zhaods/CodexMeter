@@ -13,12 +13,7 @@ struct CursorUsageView: View {
         if let snapshot {
             VStack(alignment: .leading, spacing: 8) {
                 meterSectionHeading("额度一览", caption: snapshot.plan.planName.uppercased())
-                HStack(alignment: .top, spacing: 10) {
-                    hero(snapshot: snapshot)
-                        .frame(width: MeterPanelMetrics.heroWidth)
-                    cursorCards(snapshot: snapshot)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
+                cursorQuotaRow(snapshot: snapshot)
             }
 
             detailBand(
@@ -31,21 +26,45 @@ struct CursorUsageView: View {
         }
     }
 
+    @ViewBuilder
+    private func cursorQuotaRow(snapshot: CursorUsageSnapshot) -> some View {
+        let plan = snapshot.plan
+        if plan.apiUsedPercent > 0 {
+            StretchHStack(spacing: 10) {
+                hero(snapshot: snapshot)
+                    .meterColumn(width: MeterPanelMetrics.heroWidth)
+                QuotaCard(window: window(plan: plan, kind: .total), isPrimary: true)
+                QuotaCard(window: window(plan: plan, kind: .auto), isPrimary: false)
+                QuotaCard(window: window(plan: plan, kind: .api), isPrimary: false)
+            }
+        } else {
+            StretchHStack(spacing: 10) {
+                hero(snapshot: snapshot)
+                    .meterColumn(width: MeterPanelMetrics.heroWidth)
+                QuotaCard(window: window(plan: plan, kind: .total), isPrimary: true)
+                QuotaCard(window: window(plan: plan, kind: .auto), isPrimary: false)
+            }
+        }
+    }
+
     private func detailBand(
         buckets: [AccountTokenUsageDailyBucket],
         summary: AccountTokenUsageSummary?
     ) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        StretchHStack(spacing: 10) {
             modelSection
-                .frame(maxWidth: .infinity, alignment: .topLeading)
 
             VStack(alignment: .leading, spacing: 10) {
                 if summary != nil || !buckets.isEmpty {
                     TokenActivityView(buckets: buckets, summary: summary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                } else {
+                    Spacer(minLength: 0)
                 }
                 CursorSettingsCard(appState: appState)
             }
-            .frame(width: MeterPanelMetrics.sideColumnWidth, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .meterColumn(width: MeterPanelMetrics.sideColumnWidth)
         }
     }
 
@@ -76,6 +95,8 @@ struct CursorUsageView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
 
+                    Spacer(minLength: 0)
+
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(resetLine(for: plan))
                             .lineLimit(1)
@@ -90,8 +111,14 @@ struct CursorUsageView: View {
                     .foregroundStyle(MeterTheme.mutedInk)
                 }
                 .padding(14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, minHeight: MeterPanelMetrics.heroMinHeight, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MeterPanelMetrics.heroMinHeight,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
     }
 
@@ -122,20 +149,6 @@ struct CursorUsageView: View {
                 .padding(14)
             }
             .frame(maxWidth: .infinity, minHeight: MeterPanelMetrics.heroMinHeight, alignment: .leading)
-        }
-    }
-
-    private func cursorCards(snapshot: CursorUsageSnapshot) -> some View {
-        let plan = snapshot.plan
-        return HStack(alignment: .top, spacing: 9) {
-            QuotaCard(window: window(plan: plan, kind: .total), isPrimary: true)
-                .frame(maxWidth: .infinity)
-            QuotaCard(window: window(plan: plan, kind: .auto), isPrimary: false)
-                .frame(maxWidth: .infinity)
-            if plan.apiUsedPercent > 0 {
-                QuotaCard(window: window(plan: plan, kind: .api), isPrimary: false)
-                    .frame(maxWidth: .infinity)
-            }
         }
     }
 
@@ -200,7 +213,9 @@ struct CursorUsageView: View {
                 if let snapshot {
                     let models = snapshot.models(in: scope)
                     if models.isEmpty {
+                        Spacer(minLength: 8)
                         placeholder(emptyModelText)
+                        Spacer(minLength: 8)
                     } else {
                         let maxTotal = max(1, models.map(\.counters.total).max() ?? 1)
                         modelColumns(models, maxTotal: maxTotal)
@@ -210,12 +225,16 @@ struct CursorUsageView: View {
                             .foregroundStyle(MeterTheme.mutedInk)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
+                        Spacer(minLength: 0)
                     }
                 } else {
+                    Spacer(minLength: 8)
                     placeholder("等待 Cursor 用量")
+                    Spacer(minLength: 8)
                 }
             }
             .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 

@@ -102,6 +102,7 @@ struct SettingsView: View {
                 }
             }
             .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
