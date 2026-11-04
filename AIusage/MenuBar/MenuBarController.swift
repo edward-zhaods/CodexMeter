@@ -39,7 +39,7 @@ final class MenuBarController: NSObject {
         popover.behavior = .transient
         popover.animates = true
         popover.appearance = NSAppearance(named: .darkAqua)
-        popover.contentSize = NSSize(width: 408, height: 360)
+        popover.contentSize = NSSize(width: 360, height: 320)
         let host = NSHostingController(rootView: PetsMenuView(appState: appState))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
@@ -76,7 +76,7 @@ final class MenuBarController: NSObject {
     private func startPetAnimation() {
         animationTimer?.invalidate()
         let timer = Timer(
-            timeInterval: 0.5,
+            timeInterval: 0.35,
             target: self,
             selector: #selector(advancePetFrame),
             userInfo: nil,
@@ -103,7 +103,8 @@ final class MenuBarController: NSObject {
         button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: petFrame)
         button.imagePosition = .imageOnly
         button.title = ""
-        button.toolTip = appState.petStatusSummary()
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"
+        button.toolTip = "AIusage \(version) · \(appState.petStatusSummary())"
     }
 
     func showFloatingStatus() {

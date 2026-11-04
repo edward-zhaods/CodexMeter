@@ -10,10 +10,10 @@ struct PetsMenuView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.5, paused: reduceMotion)) { timeline in
+        TimelineView(.animation(minimumInterval: 0.35, paused: reduceMotion)) { timeline in
             let frame = reduceMotion
                 ? 0
-                : Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % PetPixels.frameCount
+                : Int(timeline.date.timeIntervalSinceReferenceDate / 0.35) % PetPixels.frameCount
             menu(frame: frame)
         }
     }
@@ -45,7 +45,11 @@ struct PetsMenuView: View {
                 .buttonStyle(.plain)
                 .keyboardShortcut("q", modifiers: .command)
 
-                Spacer()
+                Spacer(minLength: 16)
+
+                Text(appVersion)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(PetPalette.muted)
 
                 Text("⌘Q")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
@@ -53,8 +57,7 @@ struct PetsMenuView: View {
             }
         }
         .padding(14)
-        .frame(width: 392)
-        .fixedSize(horizontal: false, vertical: true)
+        .fixedSize(horizontal: true, vertical: true)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color(red: 0.09, green: 0.10, blue: 0.16).opacity(0.96))
@@ -64,6 +67,10 @@ struct PetsMenuView: View {
                 .stroke(Color.white.opacity(0.14), lineWidth: 1)
         )
         .preferredColorScheme(.dark)
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"
     }
 
     private func row(_ kind: PetKind, frame: Int) -> some View {
