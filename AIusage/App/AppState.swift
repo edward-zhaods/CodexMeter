@@ -29,6 +29,11 @@ private enum FloatingQuotaPalette {
     )
 }
 
+struct PetQuotaGlance: Equatable {
+    var primary: String
+    var secondary: String?
+}
+
 enum FloatingDisplayStyle: String, CaseIterable, Identifiable {
     case detailed
     case circular
@@ -201,6 +206,11 @@ final class AppState: ObservableObject {
             return quotaColor(remaining: percent)
         case .agy:
             guard let percent = agyUsage?.headline?.remainingPercent else {
+                return .systemGray
+            }
+            return quotaColor(remaining: percent)
+        case .gemini:
+            guard let percent = geminiHeadline?.bucket.remainingPercent else {
                 return .systemGray
             }
             return quotaColor(remaining: percent)
@@ -515,6 +525,9 @@ final class AppState: ObservableObject {
         defer { agySyncInFlight = false }
         if agyUsage == nil {
             agyUsage = AgyUsageClient.loadCache()
+            if agyUsage != nil {
+                applyPetMoods()
+            }
         }
         agySyncState = .syncing
         let outcome = await Task.detached(priority: .utility) { () -> Result<AgyUsageSnapshot, AgyUsageError> in
@@ -531,6 +544,7 @@ final class AppState: ObservableObject {
             agyUsage = snapshot
             agySyncState = .ready
             AgyUsageClient.saveCache(snapshot)
+            applyPetMoods()
         case .failure(let error):
             agySyncState = .failed(error.localizedDescription)
         }
@@ -608,7 +622,128 @@ final class AppState: ObservableObject {
         case .claude:
             return claudeUsage != nil
         case .gemini:
-            return false
+            return geminiHeadline != nil
+        }
+    }
+
+    func quotaGlance(for kind: PetKind) -> PetQuotaGlance {
+        switch kind {
+        case .codex:
+            guard let window = fiveHourWindow ?? weeklyWindow else {
+                return PetQuotaGlance(primary: codexGlanceWaiting, secondary: nil)
+            }
+            return glance(percent: window.remainingPercentText, date: window.resetDate)
+        case .cursor:
+            guard let plan = cursorUsage?.plan else {
+                return PetQuotaGlance(primary: cursorGlanceWaiting, secondary: nil)
+            }
+            return glance(percent: plan.remainingPercentText, date: plan.cycleEnd)
+        case .gemini:
+            guard let headline = geminiHeadline else {
+                return PetQuotaGlance(primary: geminiGlanceWaiting, secondary: nil)
+            }
+            return glance(percent: headline.bucket.window.remainingPercentText, date: headline.bucket.resetDate)
+        case .claude:
+            guard let usage = claudeUsage else {
+                let failed: Bool
+                if case .failed = claudeScanState {
+                    failed = true
+                } else {
+                    failed = false
+                }
+                return PetQuotaGlance(primary: failed ? "读取失败" : "统计中", secondary: nil)
+            }
+            let today = compactTokenText(usage.totals(in: .today).total)
+            return PetQuotaGlance(primary: "今日 \(today)", secondary: nil)
+        }
+    }
+
+    var menuBarQuotaTitle: String {
+        switch selectedProvider {
+        case .codex:
+            return menuBarLine(name: "Codex", window: fiveHourWindow ?? weeklyWindow, stale: isCachedDataStale)
+        case .cursor:
+            guard let plan = cursorUsage?.plan else { return "" }
+            return menuBarLine(name: "Cursor", percent: plan.remainingPercentText, date: plan.cycleEnd)
+        case .gemini:
+            guard let headline = geminiHeadline else {
+                if case .failed = agySyncState { return "Gemini 读取失败" }
+                return ""
+            }
+            return menuBarLine(
+                name: "Gemini",
+                percent: headline.bucket.window.remainingPercentText,
+                date: headline.bucket.resetDate
+            )
+        case .claude:
+            guard let usage = claudeUsage else { return "" }
+            return "Claude 今日 \(compactTokenText(usage.totals(in: .today).total))"
+        case .agy:
+            guard let bucket = agyUsage?.headline else { return "" }
+            return menuBarLine(name: "Agy", percent: bucket.window.remainingPercentText, date: bucket.resetDate)
+        }
+    }
+
+    private var geminiHeadline: (groupTitle: String, bucket: AgyQuotaBucket)? {
+        guard let usage = agyUsage else { return nil }
+        return usage.tightest(in: usage.geminiGroups)
+    }
+
+    private func glance(percent: String, date: Date?) -> PetQuotaGlance {
+        PetQuotaGlance(
+            primary: "剩余 \(percent)",
+            secondary: date.map { "\(CountdownFormatter.resetDateText($0))重置" }
+        )
+    }
+
+    private func menuBarLine(name: String, window: QuotaWindowViewModel?, stale: Bool) -> String {
+        guard let window else { return "" }
+        return menuBarLine(
+            name: name,
+            percent: window.remainingPercentText,
+            date: window.resetDate,
+            stale: stale
+        )
+    }
+
+    private func menuBarLine(name: String, percent: String, date: Date?, stale: Bool = false) -> String {
+        let staleMark = stale ? " 旧" : ""
+        if let date {
+            return "\(name) \(percent) · \(CountdownFormatter.resetDateText(date))\(staleMark)"
+        }
+        return "\(name) \(percent)\(staleMark)"
+    }
+
+    private var codexGlanceWaiting: String {
+        switch connectionStatus {
+        case .online, .starting, .stale:
+            return "同步中"
+        case .offline:
+            return "离线"
+        case .codexNotInstalled:
+            return "未安装"
+        case .unauthenticated:
+            return "未登录"
+        case .incompatibleVersion:
+            return "版本不兼容"
+        }
+    }
+
+    private var cursorGlanceWaiting: String {
+        if case .failed = cursorSyncState {
+            return "读取失败"
+        }
+        return "同步中"
+    }
+
+    private var geminiGlanceWaiting: String {
+        switch agySyncState {
+        case .failed:
+            return "读取失败"
+        case .ready:
+            return "无额度"
+        case .idle, .syncing:
+            return "同步中"
         }
     }
 

@@ -2,23 +2,37 @@ import SwiftUI
 
 struct AgyUsageView: View {
     @ObservedObject var appState: AppState
+    var geminiOnly = false
+
+    private var displayedGroups: [AgyQuotaGroup] {
+        guard let snapshot = appState.agyUsage else { return [] }
+        return geminiOnly ? snapshot.geminiGroups : snapshot.groups
+    }
 
     var body: some View {
-        if let snapshot = appState.agyUsage, !snapshot.groups.isEmpty {
-            hero(snapshot)
-            ForEach(snapshot.groups) { group in
-                groupSection(group, headlineID: snapshot.headline?.id)
+        let groups = displayedGroups
+        if !groups.isEmpty {
+            hero(groups)
+            ForEach(groups) { group in
+                groupSection(group, headlineID: appState.agyUsage?.tightest(in: groups)?.bucket.id)
             }
         } else {
             emptyHero
         }
     }
 
-    private func hero(_ snapshot: AgyUsageSnapshot) -> some View {
-        let bucket = snapshot.headline
+    private func hero(_ groups: [AgyQuotaGroup]) -> some View {
+        let picked = appState.agyUsage?.tightest(in: groups)
+        let bucket = picked?.bucket
         let percent = bucket?.window.remainingPercentText ?? "--"
-        let detail = bucket.map { "\(snapshot.headlineGroupTitle) · \($0.window.resetLineText)" }
-            ?? "等待额度数据"
+        let detail = bucket.map { item in
+            let date = item.resetDate.map { CountdownFormatter.resetDateText($0) }
+            let groupTitle = picked?.groupTitle ?? (geminiOnly ? "Gemini" : "Agy")
+            if let date {
+                return "\(groupTitle) · \(date) · \(item.window.resetLineText)"
+            }
+            return "\(groupTitle) · \(item.window.resetLineText)"
+        } ?? "等待额度数据"
 
         return RetroCard(
             fill: MeterTheme.panel,
@@ -29,7 +43,7 @@ struct AgyUsageView: View {
                 RetroDotPattern()
 
                 VStack(alignment: .leading, spacing: 11) {
-                    Text("AGY QUOTA LEFT")
+                    Text(geminiOnly ? "GEMINI QUOTA LEFT" : "AGY QUOTA LEFT")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .tracking(1.7)
                         .foregroundStyle(MeterTheme.mutedInk)
@@ -85,7 +99,7 @@ struct AgyUsageView: View {
                 RetroDotPattern()
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("AGY CLI")
+                    Text(geminiOnly ? "GEMINI" : "AGY CLI")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .tracking(1.7)
                         .foregroundStyle(MeterTheme.mutedInk)
@@ -116,7 +130,7 @@ struct AgyUsageView: View {
         case .failed:
             return "读取失败"
         case .ready:
-            return "没有额度"
+            return geminiOnly ? "没有 Gemini 额度" : "没有额度"
         case .idle, .syncing:
             return "同步中"
         }
@@ -125,6 +139,9 @@ struct AgyUsageView: View {
     private var emptyDetail: String {
         if case .failed(let message) = appState.agySyncState {
             return message
+        }
+        if geminiOnly {
+            return "正在从 agy 读取 Gemini 额度"
         }
         return "正在读取本机 Antigravity 额度"
     }

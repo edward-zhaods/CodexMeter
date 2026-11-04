@@ -17,7 +17,7 @@ enum PetKind: String, CaseIterable, Identifiable, Sendable {
         case .claude:
             return .claude
         case .gemini:
-            return nil
+            return .gemini
         }
     }
 

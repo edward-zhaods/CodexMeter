@@ -27,7 +27,8 @@ final class MenuBarController: NSObject {
 
     private func configureStatusItem() {
         guard let button = statusItem.button else { return }
-        button.imagePosition = .imageOnly
+        button.imagePosition = .imageLeading
+        button.font = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
         button.title = ""
         button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: 0)
         button.toolTip = "AIusage"
@@ -39,7 +40,7 @@ final class MenuBarController: NSObject {
         popover.behavior = .transient
         popover.animates = true
         popover.appearance = NSAppearance(named: .darkAqua)
-        popover.contentSize = NSSize(width: 340, height: 292)
+        popover.contentSize = NSSize(width: 416, height: 320)
         let host = NSHostingController(rootView: PetsMenuView(appState: appState))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
@@ -101,9 +102,16 @@ final class MenuBarController: NSObject {
     private func updateStatusImage() {
         guard let button = statusItem.button else { return }
         button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: petFrame)
-        button.imagePosition = .imageOnly
-        button.title = ""
-        button.toolTip = appState.petStatusSummary()
+        let title = appState.menuBarQuotaTitle
+        if button.title != title {
+            button.title = title
+        }
+        let position: NSControl.ImagePosition = title.isEmpty ? .imageOnly : .imageLeading
+        if button.imagePosition != position {
+            button.imagePosition = position
+        }
+        let summary = appState.petStatusSummary()
+        button.toolTip = title.isEmpty ? summary : "\(title) · \(summary)"
     }
 
     func showFloatingStatus() {
@@ -224,6 +232,8 @@ final class MenuBarController: NSObject {
             return cursorFloatingDisplay
         case .agy:
             return agyFloatingDisplay
+        case .gemini:
+            return geminiFloatingDisplay
         }
     }
 
@@ -329,6 +339,33 @@ final class MenuBarController: NSObject {
             window.resetLineText,
             countdown,
             usage.headlineGroupTitle,
+            CGFloat(window.remainingPercent / 100),
+            appState.floatingQuotaColor
+        )
+    }
+
+    private var geminiFloatingDisplay: FloatingDisplay {
+        guard let usage = appState.agyUsage, let headline = usage.tightest(in: usage.geminiGroups) else {
+            let failedMessage: String?
+            if case .failed(let message) = appState.agySyncState {
+                failedMessage = message
+            } else {
+                failedMessage = nil
+            }
+            let title = failedMessage == nil ? "同步中" : "读取失败"
+            let detail = failedMessage ?? "读取 Gemini 额度"
+            return ("Gemini", title, title, detail, title, "Gemini", 0, appState.floatingQuotaColor)
+        }
+
+        let window = headline.bucket.window
+        let countdown = window.resetCountdownLong ?? window.resetLineText
+        return (
+            "Gemini",
+            window.remainingPercentText,
+            window.remainingPercentText,
+            window.resetLineText,
+            countdown,
+            headline.groupTitle,
             CGFloat(window.remainingPercent / 100),
             appState.floatingQuotaColor
         )

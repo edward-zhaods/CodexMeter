@@ -319,7 +319,10 @@ enum AgyUsageParser {
             return "Claude / GPT"
         }
         if lower.contains("gemini") {
-            return "Gemini"
+            if lower == "gemini" || lower == "gemini models" || lower == "gemini model" {
+                return "Gemini"
+            }
+            return raw
         }
         return raw
     }

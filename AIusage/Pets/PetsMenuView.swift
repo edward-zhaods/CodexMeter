@@ -53,7 +53,7 @@ struct PetsMenuView: View {
             }
         }
         .padding(14)
-        .frame(width: 328)
+        .frame(width: 400)
         .fixedSize(horizontal: false, vertical: true)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -70,6 +70,7 @@ struct PetsMenuView: View {
         let mood = appState.petMoods[kind] ?? .idle
         let pose: PetPose = mood == .working ? .working : .idle
         let sprite = PetPixels.image(for: kind, pose: pose, frame: frame)
+        let glance = appState.quotaGlance(for: kind)
         return HStack(spacing: 10) {
             Image(nsImage: sprite)
                 .interpolation(.none)
@@ -83,6 +84,20 @@ struct PetsMenuView: View {
                 .lineLimit(1)
 
             Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(glance.primary)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(PetPalette.text)
+                    .lineLimit(1)
+                if let secondary = glance.secondary {
+                    Text(secondary)
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(PetPalette.muted)
+                        .lineLimit(1)
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
 
             Text(mood.title)
                 .font(.system(size: 12, weight: .semibold))
