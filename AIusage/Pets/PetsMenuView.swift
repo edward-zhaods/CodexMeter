@@ -70,7 +70,7 @@ struct PetsMenuView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.3"
     }
 
     private func row(_ kind: PetKind, frame: Int) -> some View {
@@ -79,7 +79,7 @@ struct PetsMenuView: View {
         let shownFrame = mood == .working ? PetPixels.frameIndex(for: kind, frame: frame) : 0
         let sprite = PetPixels.image(for: kind, pose: pose, frame: shownFrame)
         let glance = appState.quotaGlance(for: kind)
-        return HStack(spacing: 8) {
+        return HStack(spacing: 10) {
             Image(nsImage: sprite)
                 .resizable()
                 .interpolation(.none)
@@ -92,25 +92,30 @@ struct PetsMenuView: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
 
-            VStack(alignment: .leading, spacing: 1) {
+            Spacer(minLength: 16)
+
+            VStack(alignment: .trailing, spacing: 1) {
                 Text(glance.primary)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
                     .foregroundStyle(PetPalette.text)
+                    .multilineTextAlignment(.trailing)
                     .lineLimit(1)
                 if let secondary = glance.secondary {
                     Text(secondary)
                         .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .monospacedDigit()
                         .foregroundStyle(PetPalette.muted)
+                        .multilineTextAlignment(.trailing)
                         .lineLimit(1)
                 }
             }
             .fixedSize(horizontal: true, vertical: false)
 
-            Spacer(minLength: 12)
-
             Text(mood.title)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(mood.pillText)
+                .frame(minWidth: 40, alignment: .center)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(mood.pillFill, in: Capsule())

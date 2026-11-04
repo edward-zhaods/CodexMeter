@@ -103,7 +103,7 @@ final class MenuBarController: NSObject {
         button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: petFrame)
         button.imagePosition = .imageOnly
         button.title = ""
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.3"
         button.toolTip = "AIusage \(version) · \(appState.petStatusSummary())"
     }
 
@@ -372,7 +372,12 @@ final class MenuBarController: NSObject {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 640),
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: MeterPanelMetrics.width,
+                height: MeterPanelMetrics.height
+            ),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false

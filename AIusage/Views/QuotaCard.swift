@@ -10,19 +10,20 @@ struct QuotaCard: View {
 
     var body: some View {
         RetroCard(fill: MeterTheme.fill(for: window.kind)) {
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(window.title.uppercased())
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .tracking(0.7)
                     .foregroundStyle(MeterTheme.mutedInk)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.7)
 
                 Text(window.remainingPercentText)
-                    .font(.system(size: isPrimary ? 29 : 27, weight: .black, design: .rounded))
+                    .font(.system(size: isPrimary ? 26 : 24, weight: .black, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(MeterTheme.fill(for: window.kind))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
 
                 segmentedProgress
 
@@ -49,8 +50,8 @@ struct QuotaCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
-            .padding(13)
-            .frame(maxWidth: .infinity, minHeight: 126, alignment: .leading)
+            .padding(11)
+            .frame(maxWidth: .infinity, minHeight: MeterPanelMetrics.cardMinHeight, alignment: .leading)
         }
     }
 
@@ -62,7 +63,7 @@ struct QuotaCard: View {
                     .frame(maxWidth: .infinity)
             }
         }
-        .frame(height: 9)
+        .frame(height: 8)
     }
 
     private var healthText: String {

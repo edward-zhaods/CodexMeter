@@ -9,7 +9,7 @@ struct SettingsView: View {
             cornerRadius: 15,
             shadowOffset: CGSize(width: 4, height: 6)
         ) {
-            VStack(spacing: 11) {
+            VStack(spacing: 8) {
                 HStack(alignment: .center, spacing: 10) {
                     infoBlock(title: "最后同步", value: lastSyncText)
 
@@ -20,6 +20,7 @@ struct SettingsView: View {
                         .tint(MeterTheme.coral)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(MeterTheme.ink)
+                        .fixedSize()
 
                     Button {
                         Task {
@@ -30,6 +31,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true, prominent: true))
                     .help("刷新")
+                    .fixedSize()
                 }
 
                 Rectangle()
@@ -60,6 +62,7 @@ struct SettingsView: View {
                             )
                         }
                     }
+                    .fixedSize()
                 }
 
                 HStack(alignment: .center, spacing: 8) {
@@ -98,7 +101,7 @@ struct SettingsView: View {
                     .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true, prominent: true))
                 }
             }
-            .padding(14)
+            .padding(12)
         }
     }
 
@@ -115,6 +118,7 @@ struct SettingsView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var lastSyncText: String {
