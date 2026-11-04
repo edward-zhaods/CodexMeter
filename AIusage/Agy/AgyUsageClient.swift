@@ -354,7 +354,7 @@ enum AgyUsageParser {
     private static func number(_ raw: Any?) -> Double? {
         if raw == nil || raw is NSNull { return nil }
         if let value = raw as? Double { return value }
-        if let value = raw as? Int { return value }
+        if let value = raw as? Int { return Double(value) }
         if let value = raw as? NSNumber { return value.doubleValue }
         if let text = raw as? String { return Double(text) }
         return nil
