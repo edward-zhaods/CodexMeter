@@ -81,6 +81,9 @@ final class AppState: ObservableObject {
             UserDefaults.standard.set(floatingDisplayStyle.rawValue, forKey: DefaultsKeys.floatingDisplayStyle)
         }
     }
+    @Published private(set) var petMoods: [PetKind: PetMood] = Dictionary(
+        uniqueKeysWithValues: PetKind.allCases.map { ($0, .idle) }
+    )
 
     private let notificationService = NotificationService()
     private var client: CodexAppServerClient?
@@ -95,6 +98,9 @@ final class AppState: ObservableObject {
     private let cursorClient = CursorUsageClient()
     private var cursorRefreshTask: Task<Void, Never>?
     private var cursorSyncInFlight = false
+    private var petRefreshTask: Task<Void, Never>?
+    private var petActivity = PetActivitySnapshot()
+    private var didProbePets = false
 
     init() {
         customCodexPath = UserDefaults.standard.string(forKey: DefaultsKeys.customCodexPath) ?? ""
@@ -242,6 +248,7 @@ final class AppState: ObservableObject {
         startCountdownTicker()
         startClaudeRefreshLoop()
         startCursorRefreshLoop()
+        startPetRefreshLoop()
         await connectAndRefresh()
         startRefreshLoop()
     }
@@ -251,6 +258,7 @@ final class AppState: ObservableObject {
         countdownTask?.cancel()
         claudeRefreshTask?.cancel()
         cursorRefreshTask?.cancel()
+        petRefreshTask?.cancel()
         Task {
             await client?.stop()
         }
@@ -380,6 +388,7 @@ final class AppState: ObservableObject {
         do {
             claudeUsage = try await claudeScanner.scan()
             claudeScanState = .ready
+            applyPetMoods()
         } catch {
             claudeScanState = .failed(error.localizedDescription)
         }
@@ -453,8 +462,74 @@ final class AppState: ObservableObject {
         do {
             cursorUsage = try await cursorClient.refresh()
             cursorSyncState = .ready
+            applyPetMoods()
         } catch {
             cursorSyncState = .failed(error.localizedDescription)
+        }
+    }
+
+    func petStatusSummary() -> String {
+        PetKind.allCases.map { kind in
+            let mood = petMoods[kind]?.title ?? "闲着"
+            return "\(kind.menuTitle(vacation: false)) \(mood)"
+        }
+        .joined(separator: " · ")
+    }
+
+    private func startPetRefreshLoop() {
+        petRefreshTask?.cancel()
+        petRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshPetMoods()
+                try? await Task.sleep(for: .seconds(20))
+            }
+        }
+    }
+
+    private func refreshPetMoods() async {
+        var snapshot = await Task.detached(priority: .utility) {
+            PetActivityProbe.capture()
+        }.value
+        if let latestEvent = cursorUsage?.events.map(\.timestamp).max() {
+            if snapshot.cursorLatest.map({ latestEvent > $0 }) ?? true {
+                snapshot.cursorLatest = latestEvent
+            }
+            snapshot.cursorPresent = true
+        }
+        petActivity = snapshot
+        didProbePets = true
+        applyPetMoods()
+    }
+
+    private func applyPetMoods() {
+        let now = Date()
+        var next: [PetKind: PetMood] = [:]
+        for kind in PetKind.allCases {
+            next[kind] = PetMood.resolve(
+                kind: kind,
+                latest: petActivity.latest(for: kind),
+                present: petActivity.present(for: kind),
+                accountReady: petAccountReady(kind),
+                vacation: false,
+                probed: didProbePets,
+                now: now
+            )
+        }
+        if next != petMoods {
+            petMoods = next
+        }
+    }
+
+    private func petAccountReady(_ kind: PetKind) -> Bool {
+        switch kind {
+        case .codex:
+            return connectionStatus != .codexNotInstalled
+        case .cursor:
+            return cursorUsage != nil
+        case .claude:
+            return claudeUsage != nil
+        case .gemini:
+            return false
         }
     }
 
@@ -544,6 +619,7 @@ final class AppState: ObservableObject {
         connectionStatus = .online
         isCachedDataStale = false
         lastSyncDate = Date()
+        applyPetMoods()
         cacheSnapshot(response)
         await maybeNotifyLowQuota()
     }
