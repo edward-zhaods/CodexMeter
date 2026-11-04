@@ -712,8 +712,9 @@ struct MeterPopoverView: View {
 
     private func headerSprite(pet: PetKind, mood: PetMood) -> some View {
         TimelineView(.animation(minimumInterval: 0.35, paused: reduceMotion || mood != .working)) { timeline in
+            let tick = Int(timeline.date.timeIntervalSinceReferenceDate / 0.35)
             let frame = mood == .working && !reduceMotion
-                ? Int(timeline.date.timeIntervalSinceReferenceDate / 0.35) % PetPixels.frameCount
+                ? PetPixels.frameIndex(for: pet, frame: tick)
                 : 0
             let sprite = PetPixels.image(
                 for: pet,

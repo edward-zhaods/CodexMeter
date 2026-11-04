@@ -76,7 +76,7 @@ struct PetsMenuView: View {
     private func row(_ kind: PetKind, frame: Int) -> some View {
         let mood = appState.petMoods[kind] ?? .idle
         let pose: PetPose = mood == .working ? .working : .idle
-        let shownFrame = mood == .working ? frame : 0
+        let shownFrame = mood == .working ? PetPixels.frameIndex(for: kind, frame: frame) : 0
         let sprite = PetPixels.image(for: kind, pose: pose, frame: shownFrame)
         let glance = appState.quotaGlance(for: kind)
         return HStack(spacing: 8) {

@@ -81,4 +81,10 @@ else
 fi
 
 codesign --force --deep --sign - --options runtime "$APP"
+
+INSTALL_DIR="${HOME}/Applications"
+mkdir -p "$INSTALL_DIR"
+rm -rf "$INSTALL_DIR/AIusage.app"
+cp -R "$APP" "$INSTALL_DIR/AIusage.app"
 echo "Built $APP (version $VERSION, $CONFIGURATION, $ARCH)"
+echo "Open next time: $INSTALL_DIR/AIusage.app"
