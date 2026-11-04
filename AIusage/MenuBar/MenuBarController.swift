@@ -105,7 +105,7 @@ final class MenuBarController: NSObject {
         button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: petFrame)
         button.imagePosition = .imageOnly
         button.title = ""
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.6"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.7"
         button.toolTip = "AIusage \(version) · \(appState.petStatusSummary())"
     }
 
@@ -373,10 +373,10 @@ final class MenuBarController: NSObject {
         if meterContentHeight > 1 {
             resizeMeterWindow(toContentHeight: meterContentHeight)
         } else {
-            placeMeterWindowAtTop(window)
+            placeMeterWindowCentered(window)
         }
         window.makeKeyAndOrderFront(nil)
-        placeMeterWindowAtTop(window)
+        placeMeterWindowCentered(window)
         NSApp.activate(ignoringOtherApps: true)
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(80))
@@ -384,7 +384,7 @@ final class MenuBarController: NSObject {
             if self.meterContentHeight > 1 {
                 self.resizeMeterWindow(toContentHeight: self.meterContentHeight)
             } else {
-                self.placeMeterWindowAtTop(window)
+                self.placeMeterWindowCentered(window)
             }
             window.alphaValue = 1
         }
@@ -426,7 +426,7 @@ final class MenuBarController: NSObject {
         )
         meterWindow = window
         window.contentViewController = hosting
-        placeMeterWindowAtTop(window)
+        placeMeterWindowCentered(window)
         hosting.view.layoutSubtreeIfNeeded()
         return true
     }
@@ -460,13 +460,14 @@ final class MenuBarController: NSObject {
         if abs(current.width - target.width) > 0.5 || abs(current.height - target.height) > 0.5 {
             window.setContentSize(target)
         }
-        placeMeterWindowAtTop(window)
+        placeMeterWindowCentered(window)
         window.alphaValue = 1
     }
 
-    private func placeMeterWindowAtTop(_ window: NSWindow) {
+    private func placeMeterWindowCentered(_ window: NSWindow) {
         let screen = statusItem.button?.window?.screen ?? window.screen ?? NSScreen.main
         guard let visible = screen?.visibleFrame else {
+            window.center()
             return
         }
         let frame = window.frame
@@ -474,7 +475,10 @@ final class MenuBarController: NSObject {
             max(visible.midX - frame.width / 2, visible.minX),
             max(visible.minX, visible.maxX - frame.width)
         )
-        let y = visible.maxY - frame.height
+        let y = min(
+            max(visible.midY - frame.height / 2, visible.minY),
+            max(visible.minY, visible.maxY - frame.height)
+        )
         window.setFrameOrigin(NSPoint(x: x.rounded(), y: y.rounded()))
     }
 
