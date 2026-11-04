@@ -27,8 +27,7 @@ final class MenuBarController: NSObject {
 
     private func configureStatusItem() {
         guard let button = statusItem.button else { return }
-        button.imagePosition = .imageLeading
-        button.font = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+        button.imagePosition = .imageOnly
         button.title = ""
         button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: 0)
         button.toolTip = "AIusage"
@@ -102,16 +101,9 @@ final class MenuBarController: NSObject {
     private func updateStatusImage() {
         guard let button = statusItem.button else { return }
         button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: petFrame)
-        let title = appState.menuBarQuotaTitle
-        if button.title != title {
-            button.title = title
-        }
-        let position: NSControl.ImagePosition = title.isEmpty ? .imageOnly : .imageLeading
-        if button.imagePosition != position {
-            button.imagePosition = position
-        }
-        let summary = appState.petStatusSummary()
-        button.toolTip = title.isEmpty ? summary : "\(title) · \(summary)"
+        button.imagePosition = .imageOnly
+        button.title = ""
+        button.toolTip = appState.petStatusSummary()
     }
 
     func showFloatingStatus() {

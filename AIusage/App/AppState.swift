@@ -653,45 +653,11 @@ final class AppState: ObservableObject {
         }
     }
 
-    var menuBarQuotaTitle: String {
-        switch selectedProvider {
-        case .codex:
-            return menuBarLine(name: "Codex", window: fiveHourWindow ?? weeklyWindow, stale: isCachedDataStale)
-        case .cursor:
-            guard let plan = cursorUsage?.plan else { return "" }
-            return menuBarLine(name: "Cursor", percent: plan.remainingPercentText, date: plan.cycleEnd)
-        case .claude:
-            guard let usage = claudeUsage else { return "" }
-            return "Claude 今日 \(compactTokenText(usage.totals(in: .today).total))"
-        case .agy:
-            guard let bucket = agyUsage?.headline else { return "" }
-            return menuBarLine(name: "Agy", percent: bucket.window.remainingPercentText, date: bucket.resetDate)
-        }
-    }
-
     private func glance(percent: String, date: Date?) -> PetQuotaGlance {
         PetQuotaGlance(
             primary: "剩余 \(percent)",
             secondary: date.map { "\(CountdownFormatter.resetDateText($0))重置" }
         )
-    }
-
-    private func menuBarLine(name: String, window: QuotaWindowViewModel?, stale: Bool) -> String {
-        guard let window else { return "" }
-        return menuBarLine(
-            name: name,
-            percent: window.remainingPercentText,
-            date: window.resetDate,
-            stale: stale
-        )
-    }
-
-    private func menuBarLine(name: String, percent: String, date: Date?, stale: Bool = false) -> String {
-        let staleMark = stale ? " 旧" : ""
-        if let date {
-            return "\(name) \(percent) · \(CountdownFormatter.resetDateText(date))\(staleMark)"
-        }
-        return "\(name) \(percent)\(staleMark)"
     }
 
     private var codexGlanceWaiting: String {
