@@ -53,7 +53,7 @@ struct PetsMenuView: View {
             }
         }
         .padding(14)
-        .frame(width: 400)
+        .frame(width: 430)
         .fixedSize(horizontal: false, vertical: true)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -69,13 +69,14 @@ struct PetsMenuView: View {
     private func row(_ kind: PetKind, frame: Int) -> some View {
         let mood = appState.petMoods[kind] ?? .idle
         let pose: PetPose = mood == .working ? .working : .idle
-        let sprite = PetPixels.image(for: kind, pose: pose, frame: frame)
+        let shownFrame = mood == .working ? frame : 0
+        let sprite = PetPixels.image(for: kind, pose: pose, frame: shownFrame)
         let glance = appState.quotaGlance(for: kind)
         return HStack(spacing: 10) {
             Image(nsImage: sprite)
+                .resizable()
                 .interpolation(.none)
-                .frame(width: sprite.size.width, height: sprite.size.height)
-                .frame(width: 32, height: 18, alignment: .center)
+                .frame(width: sprite.size.width * 2, height: sprite.size.height * 2)
                 .opacity(mood == .offline ? 0.4 : 1)
 
             Text(kind.menuTitle(vacation: false) + "：")

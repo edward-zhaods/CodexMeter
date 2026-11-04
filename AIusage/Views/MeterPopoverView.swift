@@ -581,8 +581,6 @@ struct MeterPopoverView: View {
                     ClaudeUsageView(appState: appState)
                 case .cursor:
                     CursorUsageView(appState: appState)
-                case .gemini:
-                    AgyUsageView(appState: appState, geminiOnly: true)
                 case .agy:
                     AgyUsageView(appState: appState)
                 }
@@ -617,7 +615,7 @@ struct MeterPopoverView: View {
     }
 
     private var providerSwitch: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             ForEach(MeterProvider.allCases) { provider in
                 Button {
                     appState.selectedProvider = provider
@@ -631,7 +629,7 @@ struct MeterPopoverView: View {
                             await appState.refreshCursorUsage()
                         }
                     }
-                    if provider == .agy || provider == .gemini {
+                    if provider == .agy {
                         Task {
                             await appState.refreshAgyUsage()
                         }
@@ -644,8 +642,7 @@ struct MeterPopoverView: View {
                 }
                 .buttonStyle(
                     RetroButtonStyle(
-                        fill: appState.selectedProvider == provider ? MeterTheme.pink : MeterTheme.panel,
-                        compact: true
+                        fill: appState.selectedProvider == provider ? MeterTheme.pink : MeterTheme.panel
                     )
                 )
             }
@@ -660,8 +657,6 @@ struct MeterPopoverView: View {
             return "CLAUDE CODE"
         case .cursor:
             return "CURSOR"
-        case .gemini:
-            return "GEMINI"
         case .agy:
             return "AGY"
         }
@@ -674,8 +669,6 @@ struct MeterPopoverView: View {
         case .claude:
             return "用量面板"
         case .cursor:
-            return "额度面板"
-        case .gemini:
             return "额度面板"
         case .agy:
             return "额度面板"
@@ -941,8 +934,6 @@ struct MeterPopoverView: View {
             return appState.claudeStatusText
         case .cursor:
             return appState.cursorStatusText
-        case .gemini:
-            return appState.agyStatusText
         case .agy:
             return appState.agyStatusText
         }
@@ -956,8 +947,6 @@ struct MeterPopoverView: View {
             return appState.claudeStatusColorName
         case .cursor:
             return appState.cursorStatusColorName
-        case .gemini:
-            return appState.agyStatusColorName
         case .agy:
             return appState.agyStatusColorName
         }

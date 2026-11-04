@@ -40,7 +40,7 @@ final class MenuBarController: NSObject {
         popover.behavior = .transient
         popover.animates = true
         popover.appearance = NSAppearance(named: .darkAqua)
-        popover.contentSize = NSSize(width: 416, height: 320)
+        popover.contentSize = NSSize(width: 446, height: 360)
         let host = NSHostingController(rootView: PetsMenuView(appState: appState))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
@@ -232,8 +232,6 @@ final class MenuBarController: NSObject {
             return cursorFloatingDisplay
         case .agy:
             return agyFloatingDisplay
-        case .gemini:
-            return geminiFloatingDisplay
         }
     }
 
@@ -339,33 +337,6 @@ final class MenuBarController: NSObject {
             window.resetLineText,
             countdown,
             usage.headlineGroupTitle,
-            CGFloat(window.remainingPercent / 100),
-            appState.floatingQuotaColor
-        )
-    }
-
-    private var geminiFloatingDisplay: FloatingDisplay {
-        guard let usage = appState.agyUsage, let headline = usage.tightest(in: usage.geminiGroups) else {
-            let failedMessage: String?
-            if case .failed(let message) = appState.agySyncState {
-                failedMessage = message
-            } else {
-                failedMessage = nil
-            }
-            let title = failedMessage == nil ? "同步中" : "读取失败"
-            let detail = failedMessage ?? "读取 Gemini 额度"
-            return ("Gemini", title, title, detail, title, "Gemini", 0, appState.floatingQuotaColor)
-        }
-
-        let window = headline.bucket.window
-        let countdown = window.resetCountdownLong ?? window.resetLineText
-        return (
-            "Gemini",
-            window.remainingPercentText,
-            window.remainingPercentText,
-            window.resetLineText,
-            countdown,
-            headline.groupTitle,
             CGFloat(window.remainingPercent / 100),
             appState.floatingQuotaColor
         )

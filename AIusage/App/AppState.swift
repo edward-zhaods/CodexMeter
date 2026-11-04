@@ -209,11 +209,6 @@ final class AppState: ObservableObject {
                 return .systemGray
             }
             return quotaColor(remaining: percent)
-        case .gemini:
-            guard let percent = geminiHeadline?.bucket.remainingPercent else {
-                return .systemGray
-            }
-            return quotaColor(remaining: percent)
         case .codex:
             guard let percent = (fiveHourWindow ?? weeklyWindow)?.remainingPercent else {
                 return .systemGray
@@ -622,7 +617,7 @@ final class AppState: ObservableObject {
         case .claude:
             return claudeUsage != nil
         case .gemini:
-            return geminiHeadline != nil
+            return agyUsage?.headline != nil
         }
     }
 
@@ -639,10 +634,10 @@ final class AppState: ObservableObject {
             }
             return glance(percent: plan.remainingPercentText, date: plan.cycleEnd)
         case .gemini:
-            guard let headline = geminiHeadline else {
+            guard let bucket = agyUsage?.headline else {
                 return PetQuotaGlance(primary: geminiGlanceWaiting, secondary: nil)
             }
-            return glance(percent: headline.bucket.window.remainingPercentText, date: headline.bucket.resetDate)
+            return glance(percent: bucket.window.remainingPercentText, date: bucket.resetDate)
         case .claude:
             guard let usage = claudeUsage else {
                 let failed: Bool
@@ -665,16 +660,6 @@ final class AppState: ObservableObject {
         case .cursor:
             guard let plan = cursorUsage?.plan else { return "" }
             return menuBarLine(name: "Cursor", percent: plan.remainingPercentText, date: plan.cycleEnd)
-        case .gemini:
-            guard let headline = geminiHeadline else {
-                if case .failed = agySyncState { return "Gemini 读取失败" }
-                return ""
-            }
-            return menuBarLine(
-                name: "Gemini",
-                percent: headline.bucket.window.remainingPercentText,
-                date: headline.bucket.resetDate
-            )
         case .claude:
             guard let usage = claudeUsage else { return "" }
             return "Claude 今日 \(compactTokenText(usage.totals(in: .today).total))"
@@ -682,11 +667,6 @@ final class AppState: ObservableObject {
             guard let bucket = agyUsage?.headline else { return "" }
             return menuBarLine(name: "Agy", percent: bucket.window.remainingPercentText, date: bucket.resetDate)
         }
-    }
-
-    private var geminiHeadline: (groupTitle: String, bucket: AgyQuotaBucket)? {
-        guard let usage = agyUsage else { return nil }
-        return usage.tightest(in: usage.geminiGroups)
     }
 
     private func glance(percent: String, date: Date?) -> PetQuotaGlance {

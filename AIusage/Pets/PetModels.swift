@@ -17,7 +17,7 @@ enum PetKind: String, CaseIterable, Identifiable, Sendable {
         case .claude:
             return .claude
         case .gemini:
-            return .gemini
+            return .agy
         }
     }
 
@@ -54,7 +54,7 @@ enum PetKind: String, CaseIterable, Identifiable, Sendable {
         case .cursor:
             return "Cursor (开发 A)"
         case .gemini:
-            return "Gemini (开发 B)"
+            return "Agy (开发 B)"
         case .claude:
             return vacation ? "Claude (休假中)" : "Claude"
         }
@@ -67,7 +67,7 @@ enum PetKind: String, CaseIterable, Identifiable, Sendable {
         case .cursor:
             return "功能实现 · 快速迭代 · 动手构建"
         case .gemini:
-            return "技术助理 · 问题分析 · 多方协作"
+            return "额度同步 · 模型配额 · 本机 agy"
         case .claude:
             return vacation ? "度假模式 · 放松充电 · 随时回归" : "长任务 · 深度处理 · 随时开工"
         }

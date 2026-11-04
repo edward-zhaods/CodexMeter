@@ -2,11 +2,9 @@ import SwiftUI
 
 struct AgyUsageView: View {
     @ObservedObject var appState: AppState
-    var geminiOnly = false
 
     private var displayedGroups: [AgyQuotaGroup] {
-        guard let snapshot = appState.agyUsage else { return [] }
-        return geminiOnly ? snapshot.geminiGroups : snapshot.groups
+        appState.agyUsage?.groups ?? []
     }
 
     var body: some View {
@@ -27,7 +25,7 @@ struct AgyUsageView: View {
         let percent = bucket?.window.remainingPercentText ?? "--"
         let detail = bucket.map { item in
             let date = item.resetDate.map { CountdownFormatter.resetDateText($0) }
-            let groupTitle = picked?.groupTitle ?? (geminiOnly ? "Gemini" : "Agy")
+            let groupTitle = picked?.groupTitle ?? "Agy"
             if let date {
                 return "\(groupTitle) · \(date) · \(item.window.resetLineText)"
             }
@@ -43,7 +41,7 @@ struct AgyUsageView: View {
                 RetroDotPattern()
 
                 VStack(alignment: .leading, spacing: 11) {
-                    Text(geminiOnly ? "GEMINI QUOTA LEFT" : "AGY QUOTA LEFT")
+                    Text("AGY QUOTA LEFT")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .tracking(1.7)
                         .foregroundStyle(MeterTheme.mutedInk)
@@ -99,7 +97,7 @@ struct AgyUsageView: View {
                 RetroDotPattern()
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(geminiOnly ? "GEMINI" : "AGY CLI")
+                    Text("AGY CLI")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .tracking(1.7)
                         .foregroundStyle(MeterTheme.mutedInk)
@@ -130,7 +128,7 @@ struct AgyUsageView: View {
         case .failed:
             return "读取失败"
         case .ready:
-            return geminiOnly ? "没有 Gemini 额度" : "没有额度"
+            return "没有额度"
         case .idle, .syncing:
             return "同步中"
         }
@@ -139,9 +137,6 @@ struct AgyUsageView: View {
     private var emptyDetail: String {
         if case .failed(let message) = appState.agySyncState {
             return message
-        }
-        if geminiOnly {
-            return "正在从 agy 读取 Gemini 额度"
         }
         return "正在读取本机 Antigravity 额度"
     }

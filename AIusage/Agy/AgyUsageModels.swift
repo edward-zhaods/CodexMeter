@@ -72,18 +72,6 @@ struct AgyQuotaBucket: Codable, Equatable, Sendable, Identifiable {
 }
 
 extension AgyUsageSnapshot {
-    /// Gemini pools inside the same agy snapshot. No second CLI call.
-    var geminiGroups: [AgyQuotaGroup] {
-        groups.compactMap { group in
-            if group.mentionsGemini {
-                return group
-            }
-            let buckets = group.buckets.filter { $0.mentionsGemini }
-            guard !buckets.isEmpty else { return nil }
-            return AgyQuotaGroup(id: "\(group.id)-gemini", title: "Gemini", buckets: buckets)
-        }
-    }
-
     func tightest(in groups: [AgyQuotaGroup]) -> (groupTitle: String, bucket: AgyQuotaBucket)? {
         let pairs = groups.flatMap { group in
             group.buckets.map { (groupTitle: group.title, bucket: $0) }
@@ -96,19 +84,5 @@ extension AgyUsageSnapshot {
             let right = rhs.bucket.resetDate ?? .distantFuture
             return left < right
         }
-    }
-}
-
-private extension AgyQuotaGroup {
-    var mentionsGemini: Bool {
-        title.range(of: "gemini", options: .caseInsensitive) != nil
-            || id.range(of: "gemini", options: .caseInsensitive) != nil
-    }
-}
-
-private extension AgyQuotaBucket {
-    var mentionsGemini: Bool {
-        id.range(of: "gemini", options: .caseInsensitive) != nil
-            || title.range(of: "gemini", options: .caseInsensitive) != nil
     }
 }
