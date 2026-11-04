@@ -103,7 +103,7 @@ final class MenuBarController: NSObject {
         button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: petFrame)
         button.imagePosition = .imageOnly
         button.title = ""
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.3"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.4"
         button.toolTip = "AIusage \(version) · \(appState.petStatusSummary())"
     }
 

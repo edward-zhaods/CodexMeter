@@ -70,7 +70,7 @@ struct PetsMenuView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.3"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.4"
     }
 
     private func row(_ kind: PetKind, frame: Int) -> some View {
