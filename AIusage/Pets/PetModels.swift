@@ -8,6 +8,19 @@ enum PetKind: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
+    var meterProvider: MeterProvider? {
+        switch self {
+        case .codex:
+            return .codex
+        case .cursor:
+            return .cursor
+        case .claude:
+            return .claude
+        case .gemini:
+            return nil
+        }
+    }
+
     var accent: Color {
         switch self {
         case .codex:
@@ -106,6 +119,7 @@ enum PetMood: String, Equatable, Sendable {
         kind: PetKind,
         latest: Date?,
         present: Bool,
+        accountReady: Bool,
         vacation: Bool,
         probed: Bool,
         now: Date
@@ -116,7 +130,7 @@ enum PetMood: String, Equatable, Sendable {
         if kind == .claude, vacation {
             return .vacation
         }
-        if present {
+        if present || accountReady {
             return .idle
         }
         if !probed {

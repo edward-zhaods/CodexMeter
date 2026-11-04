@@ -6,7 +6,7 @@ extension Notification.Name {
 }
 
 struct PetsMenuView: View {
-    @ObservedObject var store: PetStore
+    @ObservedObject var appState: AppState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -57,12 +57,12 @@ struct PetsMenuView: View {
     }
 
     private func row(_ kind: PetKind) -> some View {
-        let mood = store.moods[kind] ?? .idle
+        let mood = appState.petMoods[kind] ?? .idle
         return HStack(spacing: 10) {
             rowIcon(kind)
                 .frame(width: 22, height: 22)
 
-            Text(kind.menuTitle(vacation: store.claudeOnVacation) + "：")
+            Text(kind.menuTitle(vacation: appState.claudeOnVacation) + "：")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(PetPalette.text)
                 .lineLimit(1)

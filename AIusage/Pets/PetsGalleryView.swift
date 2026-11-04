@@ -2,8 +2,9 @@ import AppKit
 import SwiftUI
 
 struct PetsGalleryView: View {
-    @ObservedObject var store: PetStore
+    @ObservedObject var appState: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var usagePet: PetKind?
 
     var body: some View {
         ZStack {
@@ -21,6 +22,18 @@ struct PetsGalleryView: View {
             .scrollIndicators(.hidden)
         }
         .preferredColorScheme(.dark)
+        .sheet(item: $usagePet) { pet in
+            Group {
+                if pet == .gemini {
+                    GeminiNoteSheet(detail: appState.petDetailLine(.gemini))
+                } else {
+                    MeterPopoverView(appState: appState)
+                }
+            }
+            .onAppear {
+                appState.refreshIfNeededForPopover()
+            }
+        }
     }
 
     private var background: some View {
@@ -131,9 +144,9 @@ struct PetsGalleryView: View {
     }
 
     private func petCard(_ kind: PetKind, frame: Int) -> some View {
-        let mood = store.moods[kind] ?? .idle
-        let vacation = store.claudeOnVacation
-        let selected = store.focusedPet == kind
+        let mood = appState.petMoods[kind] ?? .idle
+        let vacation = appState.claudeOnVacation
+        let selected = appState.focusedPet == kind
         let livePose = PetArt.pose(for: mood)
         return VStack(alignment: .leading, spacing: 10) {
             cardHeader(kind, mood: mood, vacation: vacation)
@@ -147,10 +160,22 @@ struct PetsGalleryView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            Text(store.detailLine(kind))
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(PetPalette.muted)
-                .lineLimit(1)
+            HStack(spacing: 8) {
+                Text(appState.petDetailLine(kind))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(PetPalette.muted)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Button(kind == .gemini ? "说明" : "额度") {
+                    if let provider = kind.meterProvider {
+                        appState.selectedProvider = provider
+                    }
+                    usagePet = kind
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(kind.accent)
+            }
         }
         .padding(14)
         .background(
@@ -165,7 +190,7 @@ struct PetsGalleryView: View {
         .opacity(mood == .offline ? 0.72 : 1)
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .onTapGesture {
-            store.focusedPet = kind
+            appState.focusedPet = kind
         }
     }
 
@@ -189,7 +214,7 @@ struct PetsGalleryView: View {
             Spacer(minLength: 6)
             if kind == .claude {
                 Button(vacation ? "结束休假" : "开始休假") {
-                    store.claudeOnVacation.toggle()
+                    appState.claudeOnVacation.toggle()
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .semibold))
@@ -285,5 +310,31 @@ struct PetsGalleryView: View {
                 .foregroundStyle(kind.accent)
                 .frame(width: side, height: side)
         }
+    }
+}
+
+private struct GeminiNoteSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Gemini")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+            Text("菜单栏看的是本机 ~/.gemini 或 ~/.config/gemini 里最近改过的文件。三分钟内有写入就算工作中。Gemini 还没有额度接口，所以这里没有剩余百分比。")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(detail)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+            HStack {
+                Spacer()
+                Button("关闭") {
+                    dismiss()
+                }
+            }
+        }
+        .padding(24)
+        .frame(width: 440)
     }
 }

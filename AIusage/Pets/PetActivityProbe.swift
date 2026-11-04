@@ -132,8 +132,10 @@ enum PetActivityProbe {
                 for child in sorted.prefix(40) where !skippedNames.contains(child.lastPathComponent) {
                     queue.append((child, depth + 1))
                 }
-            } else if let date = values?.contentModificationDate, latest.map({ date > $0 }) ?? true {
-                latest = date
+            } else if let date = values?.contentModificationDate {
+                if latest == nil || date > latest! {
+                    latest = date
+                }
             }
         }
         return latest
