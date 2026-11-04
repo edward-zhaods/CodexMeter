@@ -29,7 +29,7 @@ final class MenuBarController: NSObject {
         guard let button = statusItem.button else { return }
         button.imagePosition = .imageOnly
         button.title = ""
-        button.image = PetPixels.statusBarImage(moods: appState.petMoods, bob: false)
+        button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: 0)
         button.toolTip = "AIusage"
         button.target = self
         button.action = #selector(togglePopover(_:))
@@ -39,7 +39,7 @@ final class MenuBarController: NSObject {
         popover.behavior = .transient
         popover.animates = true
         popover.appearance = NSAppearance(named: .darkAqua)
-        popover.contentSize = NSSize(width: 320, height: 268)
+        popover.contentSize = NSSize(width: 340, height: 292)
         let host = NSHostingController(rootView: PetsMenuView(appState: appState))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
@@ -76,7 +76,7 @@ final class MenuBarController: NSObject {
     private func startPetAnimation() {
         animationTimer?.invalidate()
         let timer = Timer(
-            timeInterval: 0.7,
+            timeInterval: 0.5,
             target: self,
             selector: #selector(advancePetFrame),
             userInfo: nil,
@@ -87,15 +87,20 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func advancePetFrame() {
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-        petFrame &+= 1
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            if petFrame != 0 {
+                petFrame = 0
+                updateStatusImage()
+            }
+            return
+        }
+        petFrame = (petFrame + 1) % PetPixels.frameCount
         updateStatusImage()
     }
 
     private func updateStatusImage() {
         guard let button = statusItem.button else { return }
-        let bob = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion && petFrame.isMultiple(of: 2)
-        button.image = PetPixels.statusBarImage(moods: appState.petMoods, bob: bob)
+        button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: petFrame)
         button.imagePosition = .imageOnly
         button.title = ""
         button.toolTip = appState.petStatusSummary()
@@ -217,6 +222,8 @@ final class MenuBarController: NSObject {
             return claudeFloatingDisplay
         case .cursor:
             return cursorFloatingDisplay
+        case .agy:
+            return agyFloatingDisplay
         }
     }
 
@@ -296,6 +303,33 @@ final class MenuBarController: NSObject {
             countdown,
             "本周期 \(cycleTokens)",
             CGFloat(plan.remainingPercent / 100),
+            appState.floatingQuotaColor
+        )
+    }
+
+    private var agyFloatingDisplay: FloatingDisplay {
+        guard let usage = appState.agyUsage, let bucket = usage.headline else {
+            let failedMessage: String?
+            if case .failed(let message) = appState.agySyncState {
+                failedMessage = message
+            } else {
+                failedMessage = nil
+            }
+            let title = failedMessage == nil ? "同步中" : "读取失败"
+            let detail = failedMessage ?? "读取 agy 额度"
+            return ("Agy", title, title, detail, title, "Agy", 0, appState.floatingQuotaColor)
+        }
+
+        let window = bucket.window
+        let countdown = window.resetCountdownLong ?? window.resetLineText
+        return (
+            "Agy",
+            window.remainingPercentText,
+            window.remainingPercentText,
+            window.resetLineText,
+            countdown,
+            usage.headlineGroupTitle,
+            CGFloat(window.remainingPercent / 100),
             appState.floatingQuotaColor
         )
     }

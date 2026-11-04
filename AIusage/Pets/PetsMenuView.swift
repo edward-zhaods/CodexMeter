@@ -7,14 +7,24 @@ extension Notification.Name {
 
 struct PetsMenuView: View {
     @ObservedObject var appState: AppState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        TimelineView(.animation(minimumInterval: 0.5, paused: reduceMotion)) { timeline in
+            let frame = reduceMotion
+                ? 0
+                : Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % PetPixels.frameCount
+            menu(frame: frame)
+        }
+    }
+
+    private func menu(frame: Int) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(PetKind.allCases) { kind in
                 Button {
                     NotificationCenter.default.post(name: .petsMenuSelect, object: kind.rawValue)
                 } label: {
-                    row(kind)
+                    row(kind, frame: frame)
                 }
                 .buttonStyle(.plain)
             }
@@ -43,7 +53,7 @@ struct PetsMenuView: View {
             }
         }
         .padding(14)
-        .frame(width: 308)
+        .frame(width: 328)
         .fixedSize(horizontal: false, vertical: true)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -56,14 +66,16 @@ struct PetsMenuView: View {
         .preferredColorScheme(.dark)
     }
 
-    private func row(_ kind: PetKind) -> some View {
+    private func row(_ kind: PetKind, frame: Int) -> some View {
         let mood = appState.petMoods[kind] ?? .idle
+        let pose: PetPose = mood == .working ? .working : .idle
+        let sprite = PetPixels.image(for: kind, pose: pose, frame: frame)
         return HStack(spacing: 10) {
-            Image(nsImage: PetPixels.image(for: kind))
-                .resizable()
+            Image(nsImage: sprite)
                 .interpolation(.none)
-                .scaledToFit()
-                .frame(width: 28, height: 22)
+                .frame(width: sprite.size.width, height: sprite.size.height)
+                .frame(width: 32, height: 18, alignment: .center)
+                .opacity(mood == .offline ? 0.4 : 1)
 
             Text(kind.menuTitle(vacation: false) + "：")
                 .font(.system(size: 13, weight: .semibold))

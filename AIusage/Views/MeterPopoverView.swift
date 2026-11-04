@@ -581,6 +581,8 @@ struct MeterPopoverView: View {
                     ClaudeUsageView(appState: appState)
                 case .cursor:
                     CursorUsageView(appState: appState)
+                case .agy:
+                    AgyUsageView(appState: appState)
                 }
             }
             .padding(.horizontal, 18)
@@ -627,6 +629,11 @@ struct MeterPopoverView: View {
                             await appState.refreshCursorUsage()
                         }
                     }
+                    if provider == .agy {
+                        Task {
+                            await appState.refreshAgyUsage()
+                        }
+                    }
                 } label: {
                     Text(provider.title)
                         .frame(maxWidth: .infinity)
@@ -648,6 +655,8 @@ struct MeterPopoverView: View {
             return "CLAUDE CODE"
         case .cursor:
             return "CURSOR"
+        case .agy:
+            return "AGY"
         }
     }
 
@@ -658,6 +667,8 @@ struct MeterPopoverView: View {
         case .claude:
             return "用量面板"
         case .cursor:
+            return "额度面板"
+        case .agy:
             return "额度面板"
         }
     }
@@ -921,6 +932,8 @@ struct MeterPopoverView: View {
             return appState.claudeStatusText
         case .cursor:
             return appState.cursorStatusText
+        case .agy:
+            return appState.agyStatusText
         }
     }
 
@@ -932,6 +945,8 @@ struct MeterPopoverView: View {
             return appState.claudeStatusColorName
         case .cursor:
             return appState.cursorStatusColorName
+        case .agy:
+            return appState.agyStatusColorName
         }
     }
 

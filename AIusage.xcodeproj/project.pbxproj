@@ -29,6 +29,9 @@
 		0A0000162C56A00000000016 /* PetActivityProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001162C56A00000000016 /* PetActivityProbe.swift */; };
 		0A0000172C56A00000000017 /* PetPixels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001172C56A00000000017 /* PetPixels.swift */; };
 		0A0000182C56A00000000018 /* PetsMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001182C56A00000000018 /* PetsMenuView.swift */; };
+		0A0000192C56A00000000019 /* AgyUsageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0001192C56A00000000019 /* AgyUsageModels.swift */; };
+		0A00001A2C56A0000000001A /* AgyUsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00011A2C56A0000000001A /* AgyUsageClient.swift */; };
+		0A00001B2C56A0000000001B /* AgyUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00011B2C56A0000000001B /* AgyUsageView.swift */; };
 		0A00000D2C56A0000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A00010E2C56A0000000000E /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -56,6 +59,9 @@
 		0A0001162C56A00000000016 /* PetActivityProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetActivityProbe.swift; sourceTree = "<group>"; };
 		0A0001172C56A00000000017 /* PetPixels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetPixels.swift; sourceTree = "<group>"; };
 		0A0001182C56A00000000018 /* PetsMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetsMenuView.swift; sourceTree = "<group>"; };
+		0A0001192C56A00000000019 /* AgyUsageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgyUsageModels.swift; sourceTree = "<group>"; };
+		0A00011A2C56A0000000001A /* AgyUsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgyUsageClient.swift; sourceTree = "<group>"; };
+		0A00011B2C56A0000000001B /* AgyUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgyUsageView.swift; sourceTree = "<group>"; };
 		0A00010D2C56A0000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		0A00010E2C56A0000000000E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -88,6 +94,7 @@
 				0A0000732C56A00000000073 /* Codex */,
 				0A0000752C56A00000000075 /* Claude */,
 				0A0000762C56A00000000076 /* Cursor */,
+				0A0000782C56A00000000078 /* Agy */,
 				0A0000772C56A00000000077 /* Pets */,
 				0A0000742C56A00000000074 /* System */,
 				0A00010E2C56A0000000000E /* Assets.xcassets */,
@@ -130,6 +137,7 @@
 				0A0001072C56A00000000007 /* SettingsView.swift */,
 				0A0001112C56A00000000011 /* ClaudeUsageView.swift */,
 				0A0001142C56A00000000014 /* CursorUsageView.swift */,
+				0A00011B2C56A0000000001B /* AgyUsageView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -169,6 +177,15 @@
 				0A0001132C56A00000000013 /* CursorUsageClient.swift */,
 			);
 			path = Cursor;
+			sourceTree = "<group>";
+		};
+		0A0000782C56A00000000078 /* Agy */ = {
+			isa = PBXGroup;
+			children = (
+				0A0001192C56A00000000019 /* AgyUsageModels.swift */,
+				0A00011A2C56A0000000001A /* AgyUsageClient.swift */,
+			);
+			path = Agy;
 			sourceTree = "<group>";
 		};
 		0A0000772C56A00000000077 /* Pets */ = {
@@ -273,6 +290,9 @@
 				0A0000162C56A00000000016 /* PetActivityProbe.swift in Sources */,
 				0A0000172C56A00000000017 /* PetPixels.swift in Sources */,
 				0A0000182C56A00000000018 /* PetsMenuView.swift in Sources */,
+				0A0000192C56A00000000019 /* AgyUsageModels.swift in Sources */,
+				0A00001A2C56A0000000001A /* AgyUsageClient.swift in Sources */,
+				0A00001B2C56A0000000001B /* AgyUsageView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

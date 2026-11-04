@@ -12,6 +12,7 @@ enum MeterProvider: String, CaseIterable, Identifiable, Sendable {
     case codex
     case claude
     case cursor
+    case agy
 
     var id: String { rawValue }
 
@@ -23,6 +24,8 @@ enum MeterProvider: String, CaseIterable, Identifiable, Sendable {
             return "Claude"
         case .cursor:
             return "Cursor"
+        case .agy:
+            return "Agy"
         }
     }
 }

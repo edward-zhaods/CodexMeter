@@ -61,6 +61,8 @@ final class AppState: ObservableObject {
     @Published private(set) var claudeScanState: ClaudeScanState = .idle
     @Published private(set) var cursorUsage: CursorUsageSnapshot?
     @Published private(set) var cursorSyncState: CursorSyncState = .idle
+    @Published private(set) var agyUsage: AgyUsageSnapshot?
+    @Published private(set) var agySyncState: AgySyncState = .idle
     @Published var selectedProvider: MeterProvider {
         didSet {
             UserDefaults.standard.set(selectedProvider.rawValue, forKey: DefaultsKeys.selectedProvider)
@@ -98,6 +100,8 @@ final class AppState: ObservableObject {
     private let cursorClient = CursorUsageClient()
     private var cursorRefreshTask: Task<Void, Never>?
     private var cursorSyncInFlight = false
+    private var agyRefreshTask: Task<Void, Never>?
+    private var agySyncInFlight = false
     private var petRefreshTask: Task<Void, Never>?
     private var petActivity = PetActivitySnapshot()
     private var didProbePets = false
@@ -195,6 +199,11 @@ final class AppState: ObservableObject {
                 return .systemGray
             }
             return quotaColor(remaining: percent)
+        case .agy:
+            guard let percent = agyUsage?.headline?.remainingPercent else {
+                return .systemGray
+            }
+            return quotaColor(remaining: percent)
         case .codex:
             guard let percent = (fiveHourWindow ?? weeklyWindow)?.remainingPercent else {
                 return .systemGray
@@ -248,6 +257,7 @@ final class AppState: ObservableObject {
         startCountdownTicker()
         startClaudeRefreshLoop()
         startCursorRefreshLoop()
+        startAgyRefreshLoop()
         startPetRefreshLoop()
         await connectAndRefresh()
         startRefreshLoop()
@@ -258,6 +268,7 @@ final class AppState: ObservableObject {
         countdownTask?.cancel()
         claudeRefreshTask?.cancel()
         cursorRefreshTask?.cancel()
+        agyRefreshTask?.cancel()
         petRefreshTask?.cancel()
         Task {
             await client?.stop()
@@ -268,6 +279,7 @@ final class AppState: ObservableObject {
         Task {
             await refreshClaudeUsage()
             await refreshCursorUsage()
+            await refreshAgyUsage()
         }
         guard shouldRefreshForPopover else { return }
         Task {
@@ -465,6 +477,73 @@ final class AppState: ObservableObject {
             applyPetMoods()
         } catch {
             cursorSyncState = .failed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Antigravity CLI (agy)
+
+    var agyStatusText: String {
+        switch agySyncState {
+        case .idle:
+            return "未同步"
+        case .syncing:
+            return "同步中"
+        case .ready:
+            return "已更新"
+        case .failed:
+            return "读取失败"
+        }
+    }
+
+    var agyStatusColorName: String {
+        switch agySyncState {
+        case .ready:
+            return "green"
+        case .idle, .syncing:
+            return "orange"
+        case .failed:
+            return "red"
+        }
+    }
+
+    func refreshAgyUsage(force: Bool = false) async {
+        if !force, let fetchedAt = agyUsage?.fetchedAt, Date().timeIntervalSince(fetchedAt) < 60 {
+            return
+        }
+        guard !agySyncInFlight else { return }
+        agySyncInFlight = true
+        defer { agySyncInFlight = false }
+        if agyUsage == nil {
+            agyUsage = AgyUsageClient.loadCache()
+        }
+        agySyncState = .syncing
+        let outcome = await Task.detached(priority: .utility) { () -> Result<AgyUsageSnapshot, AgyUsageError> in
+            do {
+                return .success(try AgyUsageClient.fetch())
+            } catch let error as AgyUsageError {
+                return .failure(error)
+            } catch {
+                return .failure(.commandFailed("agy 读取失败"))
+            }
+        }.value
+        switch outcome {
+        case .success(let snapshot):
+            agyUsage = snapshot
+            agySyncState = .ready
+            AgyUsageClient.saveCache(snapshot)
+        case .failure(let error):
+            agySyncState = .failed(error.localizedDescription)
+        }
+    }
+
+    private func startAgyRefreshLoop() {
+        agyRefreshTask?.cancel()
+        agyRefreshTask = Task { [weak self] in
+            await self?.refreshAgyUsage(force: true)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                await self?.refreshAgyUsage(force: true)
+            }
         }
     }
 
