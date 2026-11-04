@@ -16,14 +16,20 @@ struct ClaudeUsageView: View {
             emptyHero
         }
 
-        modelSection
+        StretchHStack(spacing: 10) {
+            modelSection
 
-        TokenActivityView(
-            buckets: snapshot?.dailyBuckets ?? [],
-            summary: snapshot?.activitySummary
-        )
-
-        ClaudeSettingsCard(appState: appState)
+            VStack(alignment: .leading, spacing: 10) {
+                TokenActivityView(
+                    buckets: snapshot?.dailyBuckets ?? [],
+                    summary: snapshot?.activitySummary
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                ClaudeSettingsCard(appState: appState)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .meterColumn(width: MeterPanelMetrics.sideColumnWidth)
+        }
     }
 
     // MARK: - Hero
@@ -40,25 +46,18 @@ struct ClaudeUsageView: View {
             ZStack(alignment: .topLeading) {
                 RetroDotPattern()
 
-                VStack(alignment: .leading, spacing: 11) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("TOKENS TODAY")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .tracking(1.7)
+                        .tracking(1.2)
                         .foregroundStyle(MeterTheme.mutedInk)
 
                     Text(compactTokens(today.total))
-                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .font(.system(size: 30, weight: .black, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(MeterTheme.ink)
+                        .foregroundStyle(MeterTheme.accent(for: .claude))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
-                        .rotationEffect(.degrees(-0.7), anchor: .leading)
+                        .minimumScaleFactor(0.6)
 
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text("输出 \(compactTokens(today.output)) · 缓存读 \(compactTokens(today.cacheRead)) · \(today.messages.formatted()) 轮")
@@ -73,9 +72,9 @@ struct ClaudeUsageView: View {
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(MeterTheme.mutedInk)
                 }
-                .padding(18)
+                .padding(14)
             }
-            .frame(maxWidth: .infinity, minHeight: 137, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: MeterPanelMetrics.heroMinHeight, alignment: .leading)
         }
     }
 
@@ -88,30 +87,26 @@ struct ClaudeUsageView: View {
             ZStack(alignment: .topLeading) {
                 RetroDotPattern()
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("READING LOCAL TRANSCRIPTS")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .tracking(1.7)
+                        .tracking(1.2)
                         .foregroundStyle(MeterTheme.mutedInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
 
                     Text(emptyTitle)
-                        .font(.system(size: 31, weight: .black, design: .rounded))
-                        .foregroundStyle(MeterTheme.ink)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
+                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .foregroundStyle(MeterTheme.accent(for: .claude))
 
                     Text(emptyDetail)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundStyle(MeterTheme.mutedInk)
                         .lineLimit(2)
                 }
-                .padding(18)
+                .padding(14)
             }
-            .frame(maxWidth: .infinity, minHeight: 137, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: MeterPanelMetrics.heroMinHeight, alignment: .leading)
         }
     }
 
@@ -145,49 +140,72 @@ struct ClaudeUsageView: View {
             cornerRadius: 16,
             shadowOffset: CGSize(width: 5, height: 7)
         ) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .center, spacing: 12) {
                     Text("模型用量")
-                        .font(.system(size: 19, weight: .black, design: .rounded))
+                        .font(.system(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(MeterTheme.ink)
 
                     Spacer()
 
-                    HStack(spacing: 14) {
+                    HStack(spacing: 10) {
                         ForEach(ClaudeUsageScope.allCases) { item in
                             scopeTab(item)
                         }
                     }
+                    .fixedSize()
                 }
 
                 if let snapshot {
                     let models = snapshot.models(in: scope)
                     if models.isEmpty {
+                        Spacer(minLength: 8)
                         placeholder("这个时间段没有 Claude 记录")
+                        Spacer(minLength: 8)
                     } else {
                         let maxTotal = max(1, models.map(\.counters.total).max() ?? 1)
-                        VStack(alignment: .leading, spacing: 11) {
-                            ForEach(Array(models.enumerated()), id: \.element.id) { index, model in
-                                modelRow(
-                                    model,
-                                    ratio: Double(model.counters.total) / Double(maxTotal),
-                                    color: barColor(at: index)
-                                )
-                            }
-                        }
+                        modelColumns(models, maxTotal: maxTotal)
 
                         footer(total: snapshot.totals(in: scope), snapshot: snapshot)
+                        Spacer(minLength: 0)
                     }
                 } else {
+                    Spacer(minLength: 8)
                     placeholder("等待统计结果")
+                    Spacer(minLength: 8)
                 }
             }
-            .padding(15)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
+    private func modelColumns(_ models: [ClaudeModelUsage], maxTotal: Int64) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(stride(from: 0, to: models.count, by: 2)), id: \.self) { start in
+                HStack(alignment: .top, spacing: 12) {
+                    modelCell(models[start], maxTotal: maxTotal, index: start)
+                    if start + 1 < models.count {
+                        modelCell(models[start + 1], maxTotal: maxTotal, index: start + 1)
+                    } else {
+                        Color.clear.frame(maxWidth: .infinity)
+                    }
+                }
+            }
+        }
+    }
+
+    private func modelCell(_ model: ClaudeModelUsage, maxTotal: Int64, index: Int) -> some View {
+        modelRow(
+            model,
+            ratio: Double(model.counters.total) / Double(max(1, maxTotal)),
+            color: barColor(at: index)
+        )
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
     private func modelRow(_ model: ClaudeModelUsage, ratio: Double, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(model.displayName)
                     .font(.system(size: 13, weight: .black, design: .rounded))
@@ -217,18 +235,18 @@ struct ClaudeUsageView: View {
                         .fill(color)
                         .overlay(
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .stroke(MeterTheme.ink, lineWidth: 1)
+                                .stroke(Color.black.opacity(0.28), lineWidth: 1)
                         )
                         .frame(width: max(8, proxy.size.width * CGFloat(min(1, max(0, ratio)))))
                 }
             }
-            .frame(height: 9)
+            .frame(height: 8)
 
             Text(breakdownText(model.counters))
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundStyle(MeterTheme.mutedInk)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.55)
         }
     }
 
@@ -311,7 +329,7 @@ private struct ClaudeSettingsCard: View {
             cornerRadius: 15,
             shadowOffset: CGSize(width: 4, height: 6)
         ) {
-            VStack(spacing: 11) {
+            VStack(spacing: 8) {
                 HStack(alignment: .center, spacing: 10) {
                     infoBlock(title: "最后统计", value: lastScanText)
 
@@ -326,7 +344,7 @@ private struct ClaudeSettingsCard: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true, prominent: true))
                     .help("重新统计")
                     .disabled(appState.claudeScanState == .scanning)
                 }
@@ -343,10 +361,10 @@ private struct ClaudeSettingsCard: View {
                     Button("退出") {
                         NSApplication.shared.terminate(nil)
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true, prominent: true))
                 }
             }
-            .padding(14)
+            .padding(12)
         }
     }
 
@@ -363,6 +381,7 @@ private struct ClaudeSettingsCard: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var lastScanText: String {

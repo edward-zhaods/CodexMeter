@@ -1,18 +1,32 @@
 import SwiftUI
 
 enum MeterTheme {
-    static let paper = Color(red: 0.996, green: 0.958, blue: 0.866)
-    static let panel = Color(red: 0.998, green: 0.989, blue: 0.958)
-    static let ink = Color(red: 0.132, green: 0.112, blue: 0.094)
-    static let mutedInk = Color(red: 0.43, green: 0.39, blue: 0.34)
+    static let paper = Color(red: 0.07, green: 0.06, blue: 0.12)
+    static let panel = Color(red: 0.11, green: 0.10, blue: 0.18)
+    static let ink = Color(red: 0.95, green: 0.96, blue: 0.99)
+    static let mutedInk = Color(red: 0.62, green: 0.67, blue: 0.78)
+    static let onAccent = Color(red: 0.07, green: 0.06, blue: 0.12)
     static let yellow = Color(red: 1.0, green: 0.84, blue: 0.29)
-    static let pink = Color(red: 0.96, green: 0.66, blue: 0.76)
-    static let blue = Color(red: 0.59, green: 0.81, blue: 0.94)
-    static let coral = Color(red: 1.0, green: 0.34, blue: 0.18)
-    static let idleBlock = Color(red: 0.93, green: 0.86, blue: 0.70)
-    static let success = Color(red: 0.14, green: 0.55, blue: 0.30)
-    static let warning = Color(red: 0.82, green: 0.48, blue: 0.05)
-    static let danger = Color(red: 0.82, green: 0.16, blue: 0.12)
+    static let pink = Color(red: 0.98, green: 0.55, blue: 0.74)
+    static let blue = Color(red: 0.45, green: 0.78, blue: 1.0)
+    static let coral = Color(red: 1.0, green: 0.45, blue: 0.32)
+    static let idleBlock = Color(red: 0.20, green: 0.22, blue: 0.32)
+    static let success = Color(red: 0.30, green: 0.86, blue: 0.52)
+    static let warning = Color(red: 1.0, green: 0.72, blue: 0.28)
+    static let danger = Color(red: 1.0, green: 0.40, blue: 0.36)
+
+    static func accent(for provider: MeterProvider) -> Color {
+        switch provider {
+        case .codex:
+            return Color(red: 0.22, green: 0.86, blue: 0.49)
+        case .cursor:
+            return Color(red: 0.67, green: 0.48, blue: 0.98)
+        case .agy:
+            return Color(red: 0.31, green: 0.72, blue: 1)
+        case .claude:
+            return Color(red: 1, green: 0.62, blue: 0.32)
+        }
+    }
 
     static func fill(for kind: QuotaWindowKind) -> Color {
         switch kind {
@@ -37,64 +51,202 @@ enum MeterTheme {
     }
 }
 
+enum MeterPanelMetrics {
+    static let width: CGFloat = 880
+    static let heroWidth: CGFloat = 340
+    static let sideColumnWidth: CGFloat = 360
+    static let heroMinHeight: CGFloat = 120
+    static let cardMinHeight: CGFloat = 120
+}
+
+@MainActor
+final class MeterPanelSizer: ObservableObject {
+    @Published var maxContentHeight: CGFloat = 860
+    var onContentHeight: ((CGFloat) -> Void)?
+}
+
+private struct PanelContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+struct MeterColumnWidth: LayoutValueKey {
+    static let defaultValue: CGFloat? = nil
+}
+
+extension View {
+    func meterColumn(width: CGFloat) -> some View {
+        layoutValue(key: MeterColumnWidth.self, value: width)
+    }
+}
+
+struct StretchHStack: Layout {
+    var spacing: CGFloat = 10
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let widths = columnWidths(proposal: proposal, subviews: subviews)
+        let height = rowHeight(widths: widths, subviews: subviews)
+        let used = usedWidth(widths)
+        return CGSize(width: max(proposal.width ?? used, used), height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let widths = columnWidths(
+            proposal: ProposedViewSize(width: bounds.width, height: proposal.height),
+            subviews: subviews
+        )
+        var x = bounds.minX
+        for index in subviews.indices {
+            let width = widths[index]
+            subviews[index].place(
+                at: CGPoint(x: x, y: bounds.minY),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: width, height: bounds.height)
+            )
+            x += width + spacing
+        }
+    }
+
+    private func rowHeight(widths: [CGFloat], subviews: Subviews) -> CGFloat {
+        var height: CGFloat = 0
+        for index in subviews.indices {
+            let measured = subviews[index]
+                .sizeThatFits(ProposedViewSize(width: widths[index], height: nil))
+                .height
+            height = max(height, measured)
+        }
+        return height
+    }
+
+    private func usedWidth(_ widths: [CGFloat]) -> CGFloat {
+        guard !widths.isEmpty else { return 0 }
+        return widths.reduce(0, +) + spacing * CGFloat(widths.count - 1)
+    }
+
+    private func columnWidths(proposal: ProposedViewSize, subviews: Subviews) -> [CGFloat] {
+        let count = subviews.count
+        guard count > 0 else { return [] }
+
+        let gaps = spacing * CGFloat(count - 1)
+        let available = max(0, (proposal.width ?? 0) - gaps)
+        var widths = Array(repeating: CGFloat(0), count: count)
+        var flexible: [Int] = []
+        var fixedSum: CGFloat = 0
+
+        for index in subviews.indices {
+            if let fixed = subviews[index][MeterColumnWidth.self] {
+                widths[index] = fixed
+                fixedSum += fixed
+            } else {
+                flexible.append(index)
+            }
+        }
+
+        if proposal.width == nil {
+            for index in flexible {
+                widths[index] = subviews[index]
+                    .sizeThatFits(ProposedViewSize(width: nil, height: nil))
+                    .width
+            }
+            return widths
+        }
+
+        let share = flexible.isEmpty
+            ? CGFloat(0)
+            : max(0, available - fixedSum) / CGFloat(flexible.count)
+        for index in flexible {
+            widths[index] = share
+        }
+        return widths
+    }
+}
+
+func meterSectionHeading(_ title: String, caption: String) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+        Text(title)
+            .font(.system(size: 17, weight: .black, design: .rounded))
+            .foregroundStyle(MeterTheme.ink)
+            .lineLimit(1)
+
+        Text(caption)
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .tracking(1.1)
+            .foregroundStyle(MeterTheme.mutedInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+    }
+}
+
+private struct MeterAccentKey: EnvironmentKey {
+    static let defaultValue = Color(red: 0.22, green: 0.86, blue: 0.49)
+}
+
+extension EnvironmentValues {
+    var meterAccent: Color {
+        get { self[MeterAccentKey.self] }
+        set { self[MeterAccentKey.self] = newValue }
+    }
+}
+
 struct RetroCard<Content: View>: View {
-    let fill: Color
+    @Environment(\.meterAccent) private var meterAccent
     let cornerRadius: CGFloat
-    let shadowOffset: CGSize
-    @ViewBuilder let content: Content
+    let content: Content
 
     init(
-        fill: Color,
+        fill: Color = MeterTheme.panel,
         cornerRadius: CGFloat = 14,
         shadowOffset: CGSize = CGSize(width: 4, height: 6),
         @ViewBuilder content: () -> Content
     ) {
-        self.fill = fill
         self.cornerRadius = cornerRadius
-        self.shadowOffset = shadowOffset
         self.content = content()
+        _ = fill
+        _ = shadowOffset
     }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-        ZStack {
-            shape
-                .fill(MeterTheme.ink)
-                .offset(x: shadowOffset.width, y: shadowOffset.height)
-
-            content
-                .background(shape.fill(fill))
-                .clipShape(shape)
-                .overlay(
-                    shape
-                        .stroke(MeterTheme.ink, lineWidth: 2.4)
-                )
-        }
-        .padding(.trailing, max(0, shadowOffset.width))
-        .padding(.bottom, max(0, shadowOffset.height))
+        content
+            .background {
+                ZStack {
+                    shape.fill(MeterTheme.panel)
+                    shape.fill(meterAccent.opacity(0.10))
+                }
+            }
+            .clipShape(shape)
+            .overlay(shape.stroke(meterAccent, lineWidth: 1.5))
+            .shadow(color: meterAccent.opacity(0.28), radius: 8, y: 0)
     }
 }
 
 struct RetroButtonStyle: ButtonStyle {
     var fill: Color = MeterTheme.panel
     var compact = false
+    var prominent = false
 
     func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed
         configuration.label
             .font(.system(size: compact ? 11 : 12, weight: .bold, design: .rounded))
-            .foregroundStyle(MeterTheme.ink)
+            .foregroundStyle((prominent || pressed) ? MeterTheme.onAccent : MeterTheme.ink)
             .padding(.horizontal, compact ? 8 : 11)
             .frame(height: compact ? 26 : 30)
             .background(
-                configuration.isPressed ? MeterTheme.yellow : fill,
-                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                pressed ? MeterTheme.yellow : fill,
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(MeterTheme.ink, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(
+                        prominent ? Color.black.opacity(0.28) : Color.white.opacity(0.16),
+                        lineWidth: 1
+                    )
             )
-            .offset(y: configuration.isPressed ? 1 : 0)
+            .offset(y: pressed ? 1 : 0)
     }
 }
 
@@ -106,7 +258,7 @@ struct RetroDotPattern: View {
                     let dot = CGRect(x: x, y: y, width: 3.2, height: 3.2)
                     context.fill(
                         Path(ellipseIn: dot),
-                        with: .color(MeterTheme.ink.opacity(0.09))
+                        with: .color(MeterTheme.ink.opacity(0.16))
                     )
                 }
             }
@@ -147,7 +299,7 @@ private struct TokenMonthMarker: Identifiable {
 }
 
 private enum TokenActivityPalette {
-    static let inactive = Color(red: 0.93, green: 0.93, blue: 0.92)
+    static let inactive = Color(red: 0.18, green: 0.20, blue: 0.28)
 
     static func color(for level: Int) -> Color {
         switch level {
@@ -186,19 +338,20 @@ struct TokenActivityView: View {
             cornerRadius: 16,
             shadowOffset: CGSize(width: 5, height: 7)
         ) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .center, spacing: 12) {
                     Text("Token 活动")
-                        .font(.system(size: 19, weight: .black, design: .rounded))
+                        .font(.system(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(MeterTheme.ink)
 
                     Spacer()
 
-                    HStack(spacing: 14) {
+                    HStack(spacing: 12) {
                         ForEach(TokenActivityScope.allCases) { item in
                             activityTab(item)
                         }
                     }
+                    .fixedSize()
                 }
 
                 Group {
@@ -211,9 +364,10 @@ struct TokenActivityView: View {
                         cumulativeContent
                     }
                 }
-                .frame(maxWidth: .infinity, minHeight: 94, alignment: .top)
+                .frame(maxWidth: .infinity, minHeight: 88, alignment: .top)
             }
-            .padding(15)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
@@ -327,22 +481,18 @@ struct TokenActivityView: View {
             Spacer(minLength: 0)
 
             RoundedRectangle(cornerRadius: 3)
-                .fill(MeterTheme.coral)
+                .fill(metricFill(for: title))
                 .frame(height: 7)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 3)
-                        .stroke(MeterTheme.ink, lineWidth: 1)
-                )
         }
         .padding(9)
         .frame(maxWidth: .infinity, minHeight: 83, alignment: .leading)
         .background(
-            metricFill(for: title),
+            MeterTheme.panel,
             in: RoundedRectangle(cornerRadius: 9, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .stroke(MeterTheme.ink, lineWidth: 1.5)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
         )
     }
 
@@ -445,13 +595,13 @@ struct TokenActivityView: View {
     private func metricFill(for title: String) -> Color {
         switch title {
         case "累计 TOKEN":
-            return MeterTheme.yellow.opacity(0.86)
+            return MeterTheme.yellow
         case "单日峰值":
-            return MeterTheme.pink.opacity(0.84)
+            return MeterTheme.pink
         case "当前连续":
-            return MeterTheme.blue.opacity(0.86)
+            return MeterTheme.blue
         default:
-            return MeterTheme.paper
+            return MeterTheme.coral
         }
     }
 }
@@ -563,53 +713,110 @@ private func activityLevel(tokens: Int64, maximum: Int64) -> Int {
 
 struct MeterPopoverView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject var sizer: MeterPanelSizer
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var contentHeight: CGFloat = 0
 
     private var heroWindow: QuotaWindowViewModel? {
         appState.fiveHourWindow ?? appState.weeklyWindow
     }
 
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 15) {
-                header
-                providerSwitch
+    private var needsScroll: Bool {
+        contentHeight > sizer.maxContentHeight + 1
+    }
 
-                switch appState.selectedProvider {
-                case .codex:
-                    codexContent
-                case .claude:
-                    ClaudeUsageView(appState: appState)
-                case .cursor:
-                    CursorUsageView(appState: appState)
+    var body: some View {
+        Group {
+            if needsScroll {
+                ScrollView(.vertical) {
+                    panelStack
                 }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(width: MeterPanelMetrics.width, height: sizer.maxContentHeight, alignment: .top)
+            } else {
+                panelStack
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 17)
-            .padding(.bottom, 18)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .scrollIndicators(.hidden)
-        .frame(width: 460, height: 620)
         .background(MeterTheme.paper)
-        .environment(\.colorScheme, .light)
+        .environment(\.colorScheme, .dark)
+        .environment(\.meterAccent, MeterTheme.accent(for: appState.selectedProvider))
+        .onPreferenceChange(PanelContentHeightKey.self) { height in
+            guard height > 80, abs(height - contentHeight) > 0.5 else { return }
+            contentHeight = height
+            sizer.onContentHeight?(height)
+        }
+    }
+
+    private var panelStack: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header
+            providerSwitch
+            providerPage
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
+        .frame(width: MeterPanelMetrics.width, alignment: .topLeading)
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: PanelContentHeightKey.self,
+                    value: proxy.size.width >= MeterPanelMetrics.width - 1 ? proxy.size.height : 0
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var providerPage: some View {
+        switch appState.selectedProvider {
+        case .codex:
+            codexContent
+        case .claude:
+            ClaudeUsageView(appState: appState)
+        case .cursor:
+            CursorUsageView(appState: appState)
+        case .agy:
+            AgyUsageView(appState: appState)
+        }
     }
 
     @ViewBuilder
     private var codexContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            meterSectionHeading("额度一览", caption: "RATE LIMIT WINDOWS")
+
+            StretchHStack(spacing: 10) {
+                codexHero
+                    .meterColumn(width: MeterPanelMetrics.heroWidth)
+                fiveHourCard
+                weeklyCard
+                lifetimeTokenCard
+            }
+
+            ForEach(appState.otherWindows) { window in
+                QuotaCard(window: window, isPrimary: false)
+            }
+        }
+
+        StretchHStack(spacing: 10) {
+            TokenActivityView(
+                buckets: appState.tokenUsageDailyBuckets,
+                summary: appState.tokenUsageSummary
+            )
+            SettingsView(appState: appState)
+                .meterColumn(width: MeterPanelMetrics.sideColumnWidth)
+        }
+    }
+
+    @ViewBuilder
+    private var codexHero: some View {
         if let heroWindow {
             hero(window: heroWindow)
         } else {
             emptyHero
         }
-
-        quotaSection
-
-        TokenActivityView(
-            buckets: appState.tokenUsageDailyBuckets,
-            summary: appState.tokenUsageSummary
-        )
-
-        SettingsView(appState: appState)
     }
 
     private var providerSwitch: some View {
@@ -627,56 +834,81 @@ struct MeterPopoverView: View {
                             await appState.refreshCursorUsage()
                         }
                     }
+                    if provider == .agy {
+                        Task {
+                            await appState.refreshAgyUsage()
+                        }
+                    }
                 } label: {
                     Text(provider.title)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(
                     RetroButtonStyle(
-                        fill: appState.selectedProvider == provider ? MeterTheme.pink : MeterTheme.panel
+                        fill: appState.selectedProvider == provider
+                            ? MeterTheme.accent(for: provider)
+                            : MeterTheme.panel,
+                        prominent: appState.selectedProvider == provider
                     )
                 )
             }
         }
     }
 
-    private var headerLabel: String {
+    private var selectedPet: PetKind {
         switch appState.selectedProvider {
         case .codex:
-            return "CODEX"
-        case .claude:
-            return "CLAUDE CODE"
+            return .codex
         case .cursor:
-            return "CURSOR"
-        }
-    }
-
-    private var headerTitle: String {
-        switch appState.selectedProvider {
-        case .codex:
-            return "额度面板"
+            return .cursor
+        case .agy:
+            return .gemini
         case .claude:
-            return "用量面板"
-        case .cursor:
-            return "额度面板"
+            return .claude
         }
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(headerLabel)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .tracking(2.2)
-                    .foregroundStyle(MeterTheme.mutedInk)
+        let pet = selectedPet
+        let mood = appState.petMoods[pet] ?? .idle
+        return HStack(alignment: .center, spacing: 12) {
+            headerSprite(pet: pet, mood: mood)
 
-                Text(headerTitle)
-                    .font(.system(size: 23, weight: .black, design: .rounded))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pet.menuTitle(vacation: false))
+                    .font(.system(size: 20, weight: .black, design: .rounded))
                     .foregroundStyle(MeterTheme.ink)
+                    .lineLimit(1)
+
+                Text(pet.subtitle(vacation: false))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(MeterTheme.accent(for: appState.selectedProvider))
+                    .lineLimit(1)
             }
 
             Spacer()
             statusBadge
+        }
+    }
+
+    private func headerSprite(pet: PetKind, mood: PetMood) -> some View {
+        TimelineView(.animation(minimumInterval: 0.35, paused: reduceMotion || mood != .working)) { timeline in
+            let tick = Int(timeline.date.timeIntervalSinceReferenceDate / 0.35)
+            let frame = mood == .working && !reduceMotion
+                ? PetPixels.frameIndex(for: pet, frame: tick)
+                : 0
+            let sprite = PetPixels.image(
+                for: pet,
+                pose: mood == .working ? .working : .idle,
+                frame: frame
+            )
+            Image(nsImage: sprite)
+                .resizable()
+                .interpolation(.none)
+                .frame(width: sprite.size.width * 3, height: sprite.size.height * 3)
+                .opacity(mood == .offline ? 0.4 : 1)
         }
     }
 
@@ -689,25 +921,22 @@ struct MeterPopoverView: View {
             ZStack(alignment: .topLeading) {
                 RetroDotPattern()
 
-                VStack(alignment: .leading, spacing: 11) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("TIME UNTIL NEXT RESET")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .tracking(1.7)
+                        .tracking(1.2)
                         .foregroundStyle(MeterTheme.mutedInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
 
                     Text(heroCountdownText(for: window))
-                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .font(.system(size: 30, weight: .black, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(MeterTheme.ink)
+                        .foregroundStyle(MeterTheme.accent(for: .codex))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
-                        .rotationEffect(.degrees(-0.7), anchor: .leading)
+                        .minimumScaleFactor(0.6)
+
+                    Spacer(minLength: 0)
 
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(heroResetDateText(for: window))
@@ -722,9 +951,15 @@ struct MeterPopoverView: View {
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(MeterTheme.mutedInk)
                 }
-                .padding(18)
+                .padding(14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, minHeight: 137, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MeterPanelMetrics.heroMinHeight,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
     }
 
@@ -737,75 +972,54 @@ struct MeterPopoverView: View {
             ZStack(alignment: .topLeading) {
                 RetroDotPattern()
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("CONNECTING TO CODEX")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .tracking(1.7)
+                        .tracking(1.2)
                         .foregroundStyle(MeterTheme.mutedInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
 
                     Text("额度同步中")
-                        .font(.system(size: 31, weight: .black, design: .rounded))
-                        .foregroundStyle(MeterTheme.ink)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
+                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .foregroundStyle(MeterTheme.accent(for: .codex))
 
                     Text("正在读取 Codex app-server 数据")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundStyle(MeterTheme.mutedInk)
                 }
-                .padding(18)
+                .padding(14)
             }
-            .frame(maxWidth: .infinity, minHeight: 137, alignment: .leading)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MeterPanelMetrics.heroMinHeight,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
     }
 
-    private var quotaSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("额度一览")
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(MeterTheme.ink)
+    @ViewBuilder
+    private var fiveHourCard: some View {
+        if let fiveHourWindow = appState.fiveHourWindow {
+            QuotaCard(
+                window: fiveHourWindow,
+                isPrimary: fiveHourWindow.id == heroWindow?.id
+            )
+        } else {
+            missingQuotaCard(title: "5 小时额度", fill: MeterTheme.yellow)
+        }
+    }
 
-                Text("RATE LIMIT WINDOWS")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .tracking(1.1)
-                    .foregroundStyle(MeterTheme.mutedInk)
-            }
-
-            HStack(alignment: .top, spacing: 9) {
-                if let fiveHourWindow = appState.fiveHourWindow {
-                    QuotaCard(
-                        window: fiveHourWindow,
-                        isPrimary: fiveHourWindow.id == heroWindow?.id
-                    )
-                    .frame(maxWidth: .infinity)
-                } else {
-                    missingQuotaCard(title: "5 小时额度", fill: MeterTheme.yellow)
-                        .frame(maxWidth: .infinity)
-                }
-
-                if let weeklyWindow = appState.weeklyWindow {
-                    QuotaCard(
-                        window: weeklyWindow,
-                        isPrimary: weeklyWindow.id == heroWindow?.id
-                    )
-                    .frame(maxWidth: .infinity)
-                } else {
-                    missingQuotaCard(title: "周额度", fill: MeterTheme.pink)
-                        .frame(maxWidth: .infinity)
-                }
-
-                lifetimeTokenCard
-                    .frame(maxWidth: .infinity)
-            }
-
-            ForEach(appState.otherWindows) { window in
-                QuotaCard(window: window, isPrimary: false)
-            }
+    @ViewBuilder
+    private var weeklyCard: some View {
+        if let weeklyWindow = appState.weeklyWindow {
+            QuotaCard(
+                window: weeklyWindow,
+                isPrimary: weeklyWindow.id == heroWindow?.id
+            )
+        } else {
+            missingQuotaCard(title: "周额度", fill: MeterTheme.pink)
         }
     }
 
@@ -819,7 +1033,7 @@ struct MeterPopoverView: View {
                     .lineLimit(1)
 
                 Text(lifetimeTokenText)
-                    .font(.system(size: 27, weight: .black, design: .rounded))
+                    .font(.system(size: 24, weight: .black, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(MeterTheme.ink)
                     .lineLimit(1)
@@ -833,15 +1047,20 @@ struct MeterPopoverView: View {
                         .frame(width: 12, height: 12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 3)
-                                .stroke(MeterTheme.ink, lineWidth: 1.2)
+                                .stroke(Color.black.opacity(0.28), lineWidth: 1.2)
                         )
                     Text("APP-SERVER")
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(MeterTheme.mutedInk)
                 }
             }
-            .padding(13)
-            .frame(maxWidth: .infinity, minHeight: 126, alignment: .leading)
+            .padding(11)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MeterPanelMetrics.cardMinHeight,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
     }
 
@@ -855,7 +1074,7 @@ struct MeterPopoverView: View {
                     .lineLimit(1)
 
                 Text("--")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .font(.system(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(MeterTheme.ink)
 
                 Spacer(minLength: 0)
@@ -864,8 +1083,13 @@ struct MeterPopoverView: View {
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(MeterTheme.mutedInk)
             }
-            .padding(13)
-            .frame(maxWidth: .infinity, minHeight: 126, alignment: .leading)
+            .padding(11)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: MeterPanelMetrics.cardMinHeight,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
         }
     }
 
@@ -874,7 +1098,7 @@ struct MeterPopoverView: View {
             Circle()
                 .fill(statusColor)
                 .frame(width: 8, height: 8)
-                .overlay(Circle().stroke(MeterTheme.ink, lineWidth: 1))
+                .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1))
 
             Text(statusBadgeText)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -889,7 +1113,7 @@ struct MeterPopoverView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(MeterTheme.ink, lineWidth: 1.6)
+                .stroke(MeterTheme.accent(for: appState.selectedProvider), lineWidth: 1.2)
         )
     }
 
@@ -921,6 +1145,8 @@ struct MeterPopoverView: View {
             return appState.claudeStatusText
         case .cursor:
             return appState.cursorStatusText
+        case .agy:
+            return appState.agyStatusText
         }
     }
 
@@ -932,6 +1158,8 @@ struct MeterPopoverView: View {
             return appState.claudeStatusColorName
         case .cursor:
             return appState.cursorStatusColorName
+        case .agy:
+            return appState.agyStatusColorName
         }
     }
 

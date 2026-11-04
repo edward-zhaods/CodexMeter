@@ -8,8 +8,12 @@ final class MenuBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private var meterWindow: NSWindow?
+    private let meterSizer = MeterPanelSizer()
+    private var meterContentHeight: CGFloat = 0
     private var floatingPanel: NSPanel?
     private var floatingView: FloatingStatusView?
+    private var animationTimer: Timer?
+    private var petFrame = 0
     private var cancellables = Set<AnyCancellable>()
 
     init(appState: AppState) {
@@ -19,14 +23,15 @@ final class MenuBarController: NSObject {
         configureStatusItem()
         configurePopover()
         bindState()
+        startPetAnimation()
+        updateStatusImage()
     }
 
     private func configureStatusItem() {
         guard let button = statusItem.button else { return }
-        button.image = nil
-        button.imagePosition = .noImage
-        button.title = "AI"
-        button.font = .systemFont(ofSize: 13, weight: .semibold)
+        button.imagePosition = .imageOnly
+        button.title = ""
+        button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: 0)
         button.toolTip = "AIusage"
         button.target = self
         button.action = #selector(togglePopover(_:))
@@ -34,10 +39,28 @@ final class MenuBarController: NSObject {
 
     private func configurePopover() {
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 460, height: 620)
-        popover.contentViewController = NSHostingController(
-            rootView: MeterPopoverView(appState: appState)
+        popover.animates = true
+        popover.appearance = NSAppearance(named: .darkAqua)
+        popover.contentSize = NSSize(width: 360, height: 320)
+        let host = NSHostingController(rootView: PetsMenuView(appState: appState))
+        host.sizingOptions = .preferredContentSize
+        popover.contentViewController = host
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handlePetSelect(_:)),
+            name: .petsMenuSelect,
+            object: nil
         )
+    }
+
+    @objc private func handlePetSelect(_ notification: Notification) {
+        guard let rawValue = notification.object as? String, let kind = PetKind(rawValue: rawValue) else { return }
+        if let provider = kind.meterProvider {
+            appState.selectedProvider = provider
+        }
+        appState.refreshIfNeededForPopover()
+        popover.performClose(nil)
+        showMeterWindow()
     }
 
     private func bindState() {
@@ -45,39 +68,45 @@ final class MenuBarController: NSObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
-                    self?.statusItem.button?.title = self?.visibleMenuTitle ?? "AI"
-                    self?.statusItem.button?.toolTip = self?.menuToolTip ?? "AIusage"
+                    self?.updateStatusImage()
                     self?.updateFloatingButton()
                 }
             }
             .store(in: &cancellables)
     }
 
-    private var visibleMenuTitle: String {
-        let compact: String
-        switch appState.selectedProvider {
-        case .codex:
-            compact = appState.compactMenuTitle
-        case .claude:
-            compact = appState.claudeCompactMenuTitle
-        case .cursor:
-            compact = appState.cursorCompactMenuTitle
-        }
-        if compact.isEmpty || compact == "..." {
-            return "AI"
-        }
-        return compact
+    private func startPetAnimation() {
+        animationTimer?.invalidate()
+        let timer = Timer(
+            timeInterval: 0.35,
+            target: self,
+            selector: #selector(advancePetFrame),
+            userInfo: nil,
+            repeats: true
+        )
+        RunLoop.main.add(timer, forMode: .common)
+        animationTimer = timer
     }
 
-    private var menuToolTip: String {
-        switch appState.selectedProvider {
-        case .codex:
-            return "Codex \(appState.compactMenuTitle)"
-        case .claude:
-            return "Claude \(appState.claudeFloatingSummary)"
-        case .cursor:
-            return "Cursor \(appState.cursorFloatingSummary)"
+    @objc private func advancePetFrame() {
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            if petFrame != 0 {
+                petFrame = 0
+                updateStatusImage()
+            }
+            return
         }
+        petFrame = (petFrame + 1) % PetPixels.frameCount
+        updateStatusImage()
+    }
+
+    private func updateStatusImage() {
+        guard let button = statusItem.button else { return }
+        button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: petFrame)
+        button.imagePosition = .imageOnly
+        button.title = ""
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.7"
+        button.toolTip = "AIusage \(version) · \(appState.petStatusSummary())"
     }
 
     func showFloatingStatus() {
@@ -196,6 +225,8 @@ final class MenuBarController: NSObject {
             return claudeFloatingDisplay
         case .cursor:
             return cursorFloatingDisplay
+        case .agy:
+            return agyFloatingDisplay
         }
     }
 
@@ -279,6 +310,33 @@ final class MenuBarController: NSObject {
         )
     }
 
+    private var agyFloatingDisplay: FloatingDisplay {
+        guard let usage = appState.agyUsage, let bucket = usage.headline else {
+            let failedMessage: String?
+            if case .failed(let message) = appState.agySyncState {
+                failedMessage = message
+            } else {
+                failedMessage = nil
+            }
+            let title = failedMessage == nil ? "同步中" : "读取失败"
+            let detail = failedMessage ?? "读取 agy 额度"
+            return ("Agy", title, title, detail, title, "Agy", 0, appState.floatingQuotaColor)
+        }
+
+        let window = bucket.window
+        let countdown = window.resetCountdownLong ?? window.resetLineText
+        return (
+            "Agy",
+            window.remainingPercentText,
+            window.remainingPercentText,
+            window.resetLineText,
+            countdown,
+            usage.headlineGroupTitle,
+            CGFloat(window.remainingPercent / 100),
+            appState.floatingQuotaColor
+        )
+    }
+
     private func positionFloatingPanel(_ panel: NSPanel) {
         if let saved = UserDefaults.standard.string(forKey: "floatingPanelOrigin") {
             let parts = saved.split(separator: ",").compactMap { Double($0) }
@@ -309,14 +367,35 @@ final class MenuBarController: NSObject {
     }
 
     func showMeterWindow() {
-        if let meterWindow {
-            meterWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
+        updateMeterLimit()
+        _ = ensureMeterWindow()
+        guard let window = meterWindow else { return }
+        if meterContentHeight > 1 {
+            resizeMeterWindow(toContentHeight: meterContentHeight)
+        } else {
+            placeMeterWindowCentered(window)
         }
+        window.makeKeyAndOrderFront(nil)
+        placeMeterWindowCentered(window)
+        NSApp.activate(ignoringOtherApps: true)
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(80))
+            guard let window = self.meterWindow else { return }
+            if self.meterContentHeight > 1 {
+                self.resizeMeterWindow(toContentHeight: self.meterContentHeight)
+            } else {
+                self.placeMeterWindowCentered(window)
+            }
+            window.alphaValue = 1
+        }
+    }
+
+    @discardableResult
+    private func ensureMeterWindow() -> Bool {
+        if meterWindow != nil { return false }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 640),
+            contentRect: NSRect(x: 0, y: 0, width: MeterPanelMetrics.width, height: 360),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -324,18 +403,83 @@ final class MenuBarController: NSObject {
         window.title = "AIusage"
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
+        window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(
-            calibratedRed: 0.996,
-            green: 0.958,
-            blue: 0.866,
+            calibratedRed: 0.07,
+            green: 0.06,
+            blue: 0.12,
             alpha: 1
         )
-        window.center()
         window.isReleasedWhenClosed = false
-        window.contentViewController = NSHostingController(rootView: MeterPopoverView(appState: appState))
+        window.isRestorable = false
+        window.alphaValue = 0
+
+        meterSizer.onContentHeight = { [weak self] height in
+            Task { @MainActor in
+                guard let self else { return }
+                self.meterContentHeight = height
+                self.resizeMeterWindow(toContentHeight: height)
+            }
+        }
+        let hosting = NSHostingController(
+            rootView: MeterPopoverView(appState: appState, sizer: meterSizer)
+        )
         meterWindow = window
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        window.contentViewController = hosting
+        placeMeterWindowCentered(window)
+        hosting.view.layoutSubtreeIfNeeded()
+        return true
+    }
+
+    private func updateMeterLimit() {
+        let limit = meterMaxContentHeight()
+        if abs(meterSizer.maxContentHeight - limit) > 0.5 {
+            meterSizer.maxContentHeight = limit
+        }
+    }
+
+    private func meterMaxContentHeight() -> CGFloat {
+        let screen = statusItem.button?.window?.screen ?? meterWindow?.screen ?? NSScreen.main
+        let visible = screen?.visibleFrame.height ?? 900
+        let titlebar: CGFloat
+        if let window = meterWindow, window.frame.height > 0 {
+            let content = window.contentRect(forFrameRect: window.frame).height
+            titlebar = max(28, window.frame.height - content)
+        } else {
+            titlebar = 28
+        }
+        return max(420, visible - titlebar - 6)
+    }
+
+    private func resizeMeterWindow(toContentHeight height: CGFloat) {
+        guard let window = meterWindow else { return }
+        updateMeterLimit()
+        let contentHeight = min(max(height, 120), meterSizer.maxContentHeight)
+        let target = NSSize(width: MeterPanelMetrics.width, height: contentHeight)
+        let current = window.contentRect(forFrameRect: window.frame).size
+        if abs(current.width - target.width) > 0.5 || abs(current.height - target.height) > 0.5 {
+            window.setContentSize(target)
+        }
+        placeMeterWindowCentered(window)
+        window.alphaValue = 1
+    }
+
+    private func placeMeterWindowCentered(_ window: NSWindow) {
+        let screen = statusItem.button?.window?.screen ?? window.screen ?? NSScreen.main
+        guard let visible = screen?.visibleFrame else {
+            window.center()
+            return
+        }
+        let frame = window.frame
+        let x = min(
+            max(visible.midX - frame.width / 2, visible.minX),
+            max(visible.minX, visible.maxX - frame.width)
+        )
+        let y = min(
+            max(visible.midY - frame.height / 2, visible.minY),
+            max(visible.minY, visible.maxY - frame.height)
+        )
+        window.setFrameOrigin(NSPoint(x: x.rounded(), y: y.rounded()))
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {

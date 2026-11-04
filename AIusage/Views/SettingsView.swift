@@ -9,7 +9,7 @@ struct SettingsView: View {
             cornerRadius: 15,
             shadowOffset: CGSize(width: 4, height: 6)
         ) {
-            VStack(spacing: 11) {
+            VStack(spacing: 8) {
                 HStack(alignment: .center, spacing: 10) {
                     infoBlock(title: "最后同步", value: lastSyncText)
 
@@ -20,6 +20,7 @@ struct SettingsView: View {
                         .tint(MeterTheme.coral)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(MeterTheme.ink)
+                        .fixedSize()
 
                     Button {
                         Task {
@@ -28,8 +29,9 @@ struct SettingsView: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true, prominent: true))
                     .help("刷新")
+                    .fixedSize()
                 }
 
                 Rectangle()
@@ -53,12 +55,14 @@ struct SettingsView: View {
                                 RetroButtonStyle(
                                     fill: appState.floatingDisplayStyle == style
                                         ? MeterTheme.pink
-                                        : MeterTheme.paper,
-                                    compact: true
+                                        : MeterTheme.panel,
+                                    compact: true,
+                                    prominent: appState.floatingDisplayStyle == style
                                 )
                             )
                         }
                     }
+                    .fixedSize()
                 }
 
                 HStack(alignment: .center, spacing: 8) {
@@ -89,15 +93,16 @@ struct SettingsView: View {
                             await appState.reconnect()
                         }
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.blue, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.blue, compact: true, prominent: true))
 
                     Button("退出") {
                         NSApplication.shared.terminate(nil)
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true, prominent: true))
                 }
             }
-            .padding(14)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
@@ -114,6 +119,7 @@ struct SettingsView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var lastSyncText: String {

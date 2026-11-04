@@ -29,6 +29,11 @@ private enum FloatingQuotaPalette {
     )
 }
 
+struct PetQuotaGlance: Equatable {
+    var primary: String
+    var secondary: String?
+}
+
 enum FloatingDisplayStyle: String, CaseIterable, Identifiable {
     case detailed
     case circular
@@ -61,6 +66,8 @@ final class AppState: ObservableObject {
     @Published private(set) var claudeScanState: ClaudeScanState = .idle
     @Published private(set) var cursorUsage: CursorUsageSnapshot?
     @Published private(set) var cursorSyncState: CursorSyncState = .idle
+    @Published private(set) var agyUsage: AgyUsageSnapshot?
+    @Published private(set) var agySyncState: AgySyncState = .idle
     @Published var selectedProvider: MeterProvider {
         didSet {
             UserDefaults.standard.set(selectedProvider.rawValue, forKey: DefaultsKeys.selectedProvider)
@@ -81,6 +88,9 @@ final class AppState: ObservableObject {
             UserDefaults.standard.set(floatingDisplayStyle.rawValue, forKey: DefaultsKeys.floatingDisplayStyle)
         }
     }
+    @Published private(set) var petMoods: [PetKind: PetMood] = Dictionary(
+        uniqueKeysWithValues: PetKind.allCases.map { ($0, .idle) }
+    )
 
     private let notificationService = NotificationService()
     private var client: CodexAppServerClient?
@@ -95,6 +105,11 @@ final class AppState: ObservableObject {
     private let cursorClient = CursorUsageClient()
     private var cursorRefreshTask: Task<Void, Never>?
     private var cursorSyncInFlight = false
+    private var agyRefreshTask: Task<Void, Never>?
+    private var agySyncInFlight = false
+    private var petRefreshTask: Task<Void, Never>?
+    private var petActivity = PetActivitySnapshot()
+    private var didProbePets = false
 
     init() {
         customCodexPath = UserDefaults.standard.string(forKey: DefaultsKeys.customCodexPath) ?? ""
@@ -189,6 +204,11 @@ final class AppState: ObservableObject {
                 return .systemGray
             }
             return quotaColor(remaining: percent)
+        case .agy:
+            guard let percent = agyUsage?.headline?.remainingPercent else {
+                return .systemGray
+            }
+            return quotaColor(remaining: percent)
         case .codex:
             guard let percent = (fiveHourWindow ?? weeklyWindow)?.remainingPercent else {
                 return .systemGray
@@ -242,6 +262,8 @@ final class AppState: ObservableObject {
         startCountdownTicker()
         startClaudeRefreshLoop()
         startCursorRefreshLoop()
+        startAgyRefreshLoop()
+        startPetRefreshLoop()
         await connectAndRefresh()
         startRefreshLoop()
     }
@@ -251,6 +273,8 @@ final class AppState: ObservableObject {
         countdownTask?.cancel()
         claudeRefreshTask?.cancel()
         cursorRefreshTask?.cancel()
+        agyRefreshTask?.cancel()
+        petRefreshTask?.cancel()
         Task {
             await client?.stop()
         }
@@ -260,6 +284,7 @@ final class AppState: ObservableObject {
         Task {
             await refreshClaudeUsage()
             await refreshCursorUsage()
+            await refreshAgyUsage()
         }
         guard shouldRefreshForPopover else { return }
         Task {
@@ -380,6 +405,7 @@ final class AppState: ObservableObject {
         do {
             claudeUsage = try await claudeScanner.scan()
             claudeScanState = .ready
+            applyPetMoods()
         } catch {
             claudeScanState = .failed(error.localizedDescription)
         }
@@ -453,8 +479,217 @@ final class AppState: ObservableObject {
         do {
             cursorUsage = try await cursorClient.refresh()
             cursorSyncState = .ready
+            applyPetMoods()
         } catch {
             cursorSyncState = .failed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Antigravity CLI (agy)
+
+    var agyStatusText: String {
+        switch agySyncState {
+        case .idle:
+            return "未同步"
+        case .syncing:
+            return "同步中"
+        case .ready:
+            return "已更新"
+        case .failed:
+            return "读取失败"
+        }
+    }
+
+    var agyStatusColorName: String {
+        switch agySyncState {
+        case .ready:
+            return "green"
+        case .idle, .syncing:
+            return "orange"
+        case .failed:
+            return "red"
+        }
+    }
+
+    func refreshAgyUsage(force: Bool = false) async {
+        if !force, let fetchedAt = agyUsage?.fetchedAt, Date().timeIntervalSince(fetchedAt) < 60 {
+            return
+        }
+        guard !agySyncInFlight else { return }
+        agySyncInFlight = true
+        defer { agySyncInFlight = false }
+        if agyUsage == nil {
+            agyUsage = AgyUsageClient.loadCache()
+            if agyUsage != nil {
+                applyPetMoods()
+            }
+        }
+        agySyncState = .syncing
+        let outcome = await Task.detached(priority: .utility) { () -> Result<AgyUsageSnapshot, AgyUsageError> in
+            do {
+                return .success(try AgyUsageClient.fetch())
+            } catch let error as AgyUsageError {
+                return .failure(error)
+            } catch {
+                return .failure(.commandFailed("agy 读取失败"))
+            }
+        }.value
+        switch outcome {
+        case .success(let snapshot):
+            agyUsage = snapshot
+            agySyncState = .ready
+            AgyUsageClient.saveCache(snapshot)
+            applyPetMoods()
+        case .failure(let error):
+            agySyncState = .failed(error.localizedDescription)
+        }
+    }
+
+    private func startAgyRefreshLoop() {
+        agyRefreshTask?.cancel()
+        agyRefreshTask = Task { [weak self] in
+            await self?.refreshAgyUsage(force: true)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                await self?.refreshAgyUsage(force: true)
+            }
+        }
+    }
+
+    func petStatusSummary() -> String {
+        PetKind.allCases.map { kind in
+            let mood = petMoods[kind]?.title ?? "闲着"
+            return "\(kind.menuTitle(vacation: false)) \(mood)"
+        }
+        .joined(separator: " · ")
+    }
+
+    private func startPetRefreshLoop() {
+        petRefreshTask?.cancel()
+        petRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshPetMoods()
+                try? await Task.sleep(for: .seconds(20))
+            }
+        }
+    }
+
+    private func refreshPetMoods() async {
+        var snapshot = await Task.detached(priority: .utility) {
+            PetActivityProbe.capture()
+        }.value
+        if let latestEvent = cursorUsage?.events.map(\.timestamp).max() {
+            if snapshot.cursorLatest.map({ latestEvent > $0 }) ?? true {
+                snapshot.cursorLatest = latestEvent
+            }
+            snapshot.cursorPresent = true
+        }
+        petActivity = snapshot
+        didProbePets = true
+        applyPetMoods()
+    }
+
+    private func applyPetMoods() {
+        let now = Date()
+        var next: [PetKind: PetMood] = [:]
+        for kind in PetKind.allCases {
+            next[kind] = PetMood.resolve(
+                kind: kind,
+                latest: petActivity.latest(for: kind),
+                present: petActivity.present(for: kind),
+                accountReady: petAccountReady(kind),
+                vacation: false,
+                probed: didProbePets,
+                now: now
+            )
+        }
+        if next != petMoods {
+            petMoods = next
+        }
+    }
+
+    private func petAccountReady(_ kind: PetKind) -> Bool {
+        switch kind {
+        case .codex:
+            return connectionStatus != .codexNotInstalled
+        case .cursor:
+            return cursorUsage != nil
+        case .claude:
+            return claudeUsage != nil
+        case .gemini:
+            return agyUsage?.headline != nil
+        }
+    }
+
+    func quotaGlance(for kind: PetKind) -> PetQuotaGlance {
+        switch kind {
+        case .codex:
+            guard let window = fiveHourWindow ?? weeklyWindow else {
+                return PetQuotaGlance(primary: codexGlanceWaiting, secondary: nil)
+            }
+            return glance(percent: window.remainingPercentText, date: window.resetDate)
+        case .cursor:
+            guard let plan = cursorUsage?.plan else {
+                return PetQuotaGlance(primary: cursorGlanceWaiting, secondary: nil)
+            }
+            return glance(percent: plan.remainingPercentText, date: plan.cycleEnd)
+        case .gemini:
+            guard let bucket = agyUsage?.headline else {
+                return PetQuotaGlance(primary: geminiGlanceWaiting, secondary: nil)
+            }
+            return glance(percent: bucket.window.remainingPercentText, date: bucket.resetDate)
+        case .claude:
+            guard let usage = claudeUsage else {
+                let failed: Bool
+                if case .failed = claudeScanState {
+                    failed = true
+                } else {
+                    failed = false
+                }
+                return PetQuotaGlance(primary: failed ? "读取失败" : "统计中", secondary: nil)
+            }
+            let today = compactTokenText(usage.totals(in: .today).total)
+            return PetQuotaGlance(primary: "今日 \(today)", secondary: nil)
+        }
+    }
+
+    private func glance(percent: String, date: Date?) -> PetQuotaGlance {
+        PetQuotaGlance(
+            primary: "剩余 \(percent)",
+            secondary: date.map { "\(CountdownFormatter.resetDateText($0))重置" }
+        )
+    }
+
+    private var codexGlanceWaiting: String {
+        switch connectionStatus {
+        case .online, .starting, .stale:
+            return "同步中"
+        case .offline:
+            return "离线"
+        case .codexNotInstalled:
+            return "未安装"
+        case .unauthenticated:
+            return "未登录"
+        case .incompatibleVersion:
+            return "版本不兼容"
+        }
+    }
+
+    private var cursorGlanceWaiting: String {
+        if case .failed = cursorSyncState {
+            return "读取失败"
+        }
+        return "同步中"
+    }
+
+    private var geminiGlanceWaiting: String {
+        switch agySyncState {
+        case .failed:
+            return "读取失败"
+        case .ready:
+            return "无额度"
+        case .idle, .syncing:
+            return "同步中"
         }
     }
 
@@ -544,6 +779,7 @@ final class AppState: ObservableObject {
         connectionStatus = .online
         isCachedDataStale = false
         lastSyncDate = Date()
+        applyPetMoods()
         cacheSnapshot(response)
         await maybeNotifyLowQuota()
     }

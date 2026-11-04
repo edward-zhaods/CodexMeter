@@ -31,4 +31,26 @@ enum CountdownFormatter {
         }
         return "\(minutes)分钟后"
     }
+
+    /// Calendar reset date, for example `11月11日`. Adds the year when it is not this year.
+    static func resetDateText(_ date: Date, now: Date = Date()) -> String {
+        formatted(date, template: sameYear(date, now) ? "MMMd" : "yMMMd")
+    }
+
+    /// Short calendar reset date, for example `11/11`.
+    static func resetDateShort(_ date: Date, now: Date = Date()) -> String {
+        formatted(date, template: sameYear(date, now) ? "Md" : "yMd")
+    }
+
+    private static func sameYear(_ date: Date, _ now: Date) -> Bool {
+        Calendar.current.component(.year, from: date) == Calendar.current.component(.year, from: now)
+    }
+
+    private static func formatted(_ date: Date, template: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.timeZone = .current
+        formatter.setLocalizedDateFormatFromTemplate(template)
+        return formatter.string(from: date)
+    }
 }
