@@ -10,7 +10,6 @@ final class MenuBarController: NSObject {
     private var meterWindow: NSWindow?
     private let meterSizer = MeterPanelSizer()
     private var meterContentHeight: CGFloat = 0
-    private var pinMeterOnResize = false
     private var floatingPanel: NSPanel?
     private var floatingView: FloatingStatusView?
     private var animationTimer: Timer?
@@ -106,7 +105,7 @@ final class MenuBarController: NSObject {
         button.image = PetPixels.statusBarImage(moods: appState.petMoods, frame: petFrame)
         button.imagePosition = .imageOnly
         button.title = ""
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.5"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.6"
         button.toolTip = "AIusage \(version) · \(appState.petStatusSummary())"
     }
 
@@ -369,8 +368,7 @@ final class MenuBarController: NSObject {
 
     func showMeterWindow() {
         updateMeterLimit()
-        let created = ensureMeterWindow()
-        pinMeterOnResize = true
+        _ = ensureMeterWindow()
         guard let window = meterWindow else { return }
         if meterContentHeight > 1 {
             resizeMeterWindow(toContentHeight: meterContentHeight)
@@ -378,13 +376,17 @@ final class MenuBarController: NSObject {
             placeMeterWindowAtTop(window)
         }
         window.makeKeyAndOrderFront(nil)
+        placeMeterWindowAtTop(window)
         NSApp.activate(ignoringOtherApps: true)
-        guard created else { return }
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(400))
-            guard let window = self.meterWindow, window.alphaValue < 1 else { return }
+            try? await Task.sleep(for: .milliseconds(80))
+            guard let window = self.meterWindow else { return }
+            if self.meterContentHeight > 1 {
+                self.resizeMeterWindow(toContentHeight: self.meterContentHeight)
+            } else {
+                self.placeMeterWindowAtTop(window)
+            }
             window.alphaValue = 1
-            self.placeMeterWindowAtTop(window)
         }
     }
 
@@ -409,6 +411,7 @@ final class MenuBarController: NSObject {
             alpha: 1
         )
         window.isReleasedWhenClosed = false
+        window.isRestorable = false
         window.alphaValue = 0
 
         meterSizer.onContentHeight = { [weak self] height in
@@ -457,26 +460,22 @@ final class MenuBarController: NSObject {
         if abs(current.width - target.width) > 0.5 || abs(current.height - target.height) > 0.5 {
             window.setContentSize(target)
         }
-        if pinMeterOnResize {
-            placeMeterWindowAtTop(window)
-            pinMeterOnResize = false
-        }
+        placeMeterWindowAtTop(window)
         window.alphaValue = 1
     }
 
     private func placeMeterWindowAtTop(_ window: NSWindow) {
-        guard let visible = (statusItem.button?.window?.screen ?? window.screen ?? NSScreen.main)?.visibleFrame else {
-            window.center()
+        let screen = statusItem.button?.window?.screen ?? window.screen ?? NSScreen.main
+        guard let visible = screen?.visibleFrame else {
             return
         }
-        let rawX = visible.midX - window.frame.width / 2
-        let minX = visible.minX
-        let maxX = max(minX, visible.maxX - window.frame.width)
-        let origin = NSPoint(
-            x: min(max(rawX, minX), maxX).rounded(),
-            y: (visible.maxY - window.frame.height).rounded()
+        let frame = window.frame
+        let x = min(
+            max(visible.midX - frame.width / 2, visible.minX),
+            max(visible.minX, visible.maxX - frame.width)
         )
-        window.setFrameOrigin(origin)
+        let y = visible.maxY - frame.height
+        window.setFrameOrigin(NSPoint(x: x.rounded(), y: y.rounded()))
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
