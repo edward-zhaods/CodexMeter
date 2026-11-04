@@ -36,6 +36,31 @@ struct SettingsView: View {
                     .fill(MeterTheme.ink.opacity(0.16))
                     .frame(height: 1)
 
+                HStack(spacing: 9) {
+                    Text("悬浮样式")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .tracking(0.7)
+                        .foregroundStyle(MeterTheme.mutedInk)
+
+                    Spacer()
+
+                    HStack(spacing: 5) {
+                        ForEach(FloatingDisplayStyle.allCases) { style in
+                            Button(style.title) {
+                                appState.floatingDisplayStyle = style
+                            }
+                            .buttonStyle(
+                                RetroButtonStyle(
+                                    fill: appState.floatingDisplayStyle == style
+                                        ? MeterTheme.pink
+                                        : MeterTheme.paper,
+                                    compact: true
+                                )
+                            )
+                        }
+                    }
+                }
+
                 HStack(alignment: .center, spacing: 8) {
                     infoBlock(
                         title: "Codex 路径",

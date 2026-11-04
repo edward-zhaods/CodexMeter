@@ -1,17 +1,13 @@
 # AIusage
 
-AIusage 是一个 macOS 菜单栏应用。四位助手以像素宠物的形式住在菜单栏里，点开可以看各自的状态，也能继续查看 Codex、Claude Code 和 Cursor 的额度。
+AIusage 是一个 macOS 菜单栏应用，用来看 Codex、Claude Code 和 Cursor 的额度和 Token 用量。
 
 ## 功能
 
-- 菜单栏同时放着 Codex、Cursor、Gemini、Claude 四只宠物。最近三分钟内本机有会话写入时显示「工作中」，否则是「闲着」；Claude 可以手动切到「休假中」
-- 点菜单栏打开状态列表，点某一行打开角色图鉴
-- 图鉴按原型排成四张角色卡。每张卡用素材包里的四帧闲着、四帧工作中，当前状态那一帧会轮换；菜单栏用各自的 `menubar/icon`
 - Codex：读取 app-server 的实时额度、重置倒计时和账号累计 Token
 - Claude Code：读取本机 `~/.claude/projects` 的会话记录，按模型统计今日 / 7 天 / 30 天 / 累计 Token，并显示每日活动热力图
 - Cursor：读取本机已登录的 Cursor 账号，显示当前周期剩余额度、Auto / API 占用，以及按模型汇总的 Token 用量
-- Gemini：根据本机 `~/.gemini` 或 `~/.config/gemini` 的最近文件判断是否在干活，暂无额度接口
-- 像素素材在 `AIusage/Pets/Art/<角色>/{menubar,idle,working}`。界面用透明 PNG，同名 SVG 留着当源文件。这些是独立关键帧，不是雪碧图，也没有单独的主视觉大图
+- 支持详细条和圆形磨砂悬浮窗
 - Codex 低额度通知、断线重连和本地缓存
 - 根据剩余额度自动切换绿、黄、红状态色
 

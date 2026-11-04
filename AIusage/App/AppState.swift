@@ -81,16 +81,6 @@ final class AppState: ObservableObject {
             UserDefaults.standard.set(floatingDisplayStyle.rawValue, forKey: DefaultsKeys.floatingDisplayStyle)
         }
     }
-    @Published var focusedPet: PetKind = .codex
-    @Published private(set) var petMoods: [PetKind: PetMood] = Dictionary(
-        uniqueKeysWithValues: PetKind.allCases.map { ($0, .idle) }
-    )
-    @Published var claudeOnVacation: Bool {
-        didSet {
-            UserDefaults.standard.set(claudeOnVacation, forKey: DefaultsKeys.claudeOnVacation)
-            applyPetMoods()
-        }
-    }
 
     private let notificationService = NotificationService()
     private var client: CodexAppServerClient?
@@ -105,9 +95,6 @@ final class AppState: ObservableObject {
     private let cursorClient = CursorUsageClient()
     private var cursorRefreshTask: Task<Void, Never>?
     private var cursorSyncInFlight = false
-    private var petRefreshTask: Task<Void, Never>?
-    private var petActivity = PetActivitySnapshot()
-    private var didProbePets = false
 
     init() {
         customCodexPath = UserDefaults.standard.string(forKey: DefaultsKeys.customCodexPath) ?? ""
@@ -118,7 +105,6 @@ final class AppState: ObservableObject {
         selectedProvider = MeterProvider(
             rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.selectedProvider) ?? ""
         ) ?? .codex
-        claudeOnVacation = UserDefaults.standard.bool(forKey: DefaultsKeys.claudeOnVacation)
         if let cachedTokenCount = UserDefaults.standard.object(
             forKey: DefaultsKeys.lifetimeTokenCount
         ) as? NSNumber {
@@ -256,7 +242,6 @@ final class AppState: ObservableObject {
         startCountdownTicker()
         startClaudeRefreshLoop()
         startCursorRefreshLoop()
-        startPetRefreshLoop()
         await connectAndRefresh()
         startRefreshLoop()
     }
@@ -266,7 +251,6 @@ final class AppState: ObservableObject {
         countdownTask?.cancel()
         claudeRefreshTask?.cancel()
         cursorRefreshTask?.cancel()
-        petRefreshTask?.cancel()
         Task {
             await client?.stop()
         }
@@ -396,7 +380,6 @@ final class AppState: ObservableObject {
         do {
             claudeUsage = try await claudeScanner.scan()
             claudeScanState = .ready
-            applyPetMoods()
         } catch {
             claudeScanState = .failed(error.localizedDescription)
         }
@@ -470,117 +453,9 @@ final class AppState: ObservableObject {
         do {
             cursorUsage = try await cursorClient.refresh()
             cursorSyncState = .ready
-            applyPetMoods()
         } catch {
             cursorSyncState = .failed(error.localizedDescription)
         }
-    }
-
-    func petDetailLine(_ kind: PetKind) -> String {
-        switch kind {
-        case .codex:
-            if let window = fiveHourWindow ?? weeklyWindow {
-                return "剩余 \(window.remainingPercentText) · \(window.resetLineText)"
-            }
-            return statusText
-        case .cursor:
-            if let plan = cursorUsage?.plan {
-                let reset = plan.cycleEnd.map { CountdownFormatter.shortString(until: $0) } ?? "重置未知"
-                return "剩余 \(plan.remainingPercentText) · \(reset)"
-            }
-            return cursorStatusText
-        case .claude:
-            if let usage = claudeUsage {
-                let today = compactTokenText(usage.totals(in: .today).total)
-                let week = compactTokenText(usage.totals(in: .week).total)
-                return "今日 \(today) · 7 天 \(week)"
-            }
-            return claudeStatusText
-        case .gemini:
-            if let date = petActivity.geminiLatest {
-                return "最近会话 \(petRelativeText(date))"
-            }
-            return petActivity.geminiPresent ? "已发现本机 Gemini" : "未发现本机 Gemini"
-        }
-    }
-
-    func petStatusSummary() -> String {
-        PetKind.allCases.map { kind in
-            let mood = petMoods[kind]?.title ?? "闲着"
-            return "\(kind.menuTitle(vacation: claudeOnVacation)) \(mood)"
-        }
-        .joined(separator: " · ")
-    }
-
-    private func startPetRefreshLoop() {
-        petRefreshTask?.cancel()
-        petRefreshTask = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.refreshPetMoods()
-                try? await Task.sleep(for: .seconds(20))
-            }
-        }
-    }
-
-    private func refreshPetMoods() async {
-        var snapshot = await Task.detached(priority: .utility) {
-            PetActivityProbe.capture()
-        }.value
-        if let latestEvent = cursorUsage?.events.map(\.timestamp).max() {
-            if snapshot.cursorLatest == nil || latestEvent > snapshot.cursorLatest! {
-                snapshot.cursorLatest = latestEvent
-            }
-            snapshot.cursorPresent = true
-        }
-        petActivity = snapshot
-        didProbePets = true
-        applyPetMoods()
-    }
-
-    private func applyPetMoods() {
-        let now = Date()
-        var next: [PetKind: PetMood] = [:]
-        for kind in PetKind.allCases {
-            next[kind] = PetMood.resolve(
-                kind: kind,
-                latest: petActivity.latest(for: kind),
-                present: petActivity.present(for: kind),
-                accountReady: petAccountReady(kind),
-                vacation: claudeOnVacation,
-                probed: didProbePets,
-                now: now
-            )
-        }
-        if next != petMoods {
-            petMoods = next
-        }
-    }
-
-    private func petAccountReady(_ kind: PetKind) -> Bool {
-        switch kind {
-        case .codex:
-            return connectionStatus != .codexNotInstalled
-        case .cursor:
-            return cursorUsage != nil
-        case .claude:
-            return claudeUsage != nil
-        case .gemini:
-            return false
-        }
-    }
-
-    private func petRelativeText(_ date: Date) -> String {
-        let seconds = max(0, Date().timeIntervalSince(date))
-        if seconds < 60 {
-            return "刚刚"
-        }
-        if seconds < 3600 {
-            return "\(Int(seconds / 60)) 分钟前"
-        }
-        if seconds < 86_400 {
-            return "\(Int(seconds / 3600)) 小时前"
-        }
-        return "\(Int(seconds / 86_400)) 天前"
     }
 
     private func startCursorRefreshLoop() {
@@ -669,7 +544,6 @@ final class AppState: ObservableObject {
         connectionStatus = .online
         isCachedDataStale = false
         lastSyncDate = Date()
-        applyPetMoods()
         cacheSnapshot(response)
         await maybeNotifyLowQuota()
     }
@@ -812,5 +686,4 @@ private enum DefaultsKeys {
     static let lifetimeTokenCount = "lifetimeTokenCount"
     static let cachedTokenUsage = "cachedTokenUsage"
     static let selectedProvider = "meterSelectedProvider"
-    static let claudeOnVacation = "claudeOnVacation"
 }

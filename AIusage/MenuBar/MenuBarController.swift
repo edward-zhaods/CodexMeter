@@ -8,9 +8,6 @@ final class MenuBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private var meterWindow: NSWindow?
-    private var petsWindow: NSWindow?
-    private var animationTimer: Timer?
-    private var petFrame = 0
     private var floatingPanel: NSPanel?
     private var floatingView: FloatingStatusView?
     private var cancellables = Set<AnyCancellable>()
@@ -22,39 +19,25 @@ final class MenuBarController: NSObject {
         configureStatusItem()
         configurePopover()
         bindState()
-        startPetAnimation()
-        updateStatusImage()
     }
 
     private func configureStatusItem() {
         guard let button = statusItem.button else { return }
-        button.imagePosition = .imageOnly
-        button.title = ""
-        button.image = PetArt.statusBarImage(moods: appState.petMoods, bob: false)
-        button.toolTip = "MenuBar Pets"
+        button.image = nil
+        button.imagePosition = .noImage
+        button.title = "AI"
+        button.font = .systemFont(ofSize: 13, weight: .semibold)
+        button.toolTip = "AIusage"
         button.target = self
         button.action = #selector(togglePopover(_:))
     }
 
     private func configurePopover() {
         popover.behavior = .transient
-        popover.animates = true
-        popover.appearance = NSAppearance(named: .darkAqua)
-        popover.contentSize = NSSize(width: 320, height: 268)
-        let host = NSHostingController(rootView: PetsMenuView(appState: appState))
-        host.sizingOptions = .preferredContentSize
-        popover.contentViewController = host
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handlePetSelect(_:)),
-            name: .petsMenuSelect,
-            object: nil
+        popover.contentSize = NSSize(width: 460, height: 620)
+        popover.contentViewController = NSHostingController(
+            rootView: MeterPopoverView(appState: appState)
         )
-    }
-
-    @objc private func handlePetSelect(_ notification: Notification) {
-        guard let rawValue = notification.object as? String, let kind = PetKind(rawValue: rawValue) else { return }
-        focusPet(kind)
     }
 
     private func bindState() {
@@ -62,75 +45,39 @@ final class MenuBarController: NSObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
-                    self?.updateStatusImage()
+                    self?.statusItem.button?.title = self?.visibleMenuTitle ?? "AI"
+                    self?.statusItem.button?.toolTip = self?.menuToolTip ?? "AIusage"
                     self?.updateFloatingButton()
                 }
             }
             .store(in: &cancellables)
     }
 
-    private func startPetAnimation() {
-        animationTimer?.invalidate()
-        let timer = Timer(
-            timeInterval: 0.7,
-            target: self,
-            selector: #selector(advancePetFrame),
-            userInfo: nil,
-            repeats: true
-        )
-        RunLoop.main.add(timer, forMode: .common)
-        animationTimer = timer
-    }
-
-    @objc private func advancePetFrame() {
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-        petFrame &+= 1
-        updateStatusImage()
-    }
-
-    private func updateStatusImage() {
-        guard let button = statusItem.button else { return }
-        let bob = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion && petFrame.isMultiple(of: 2)
-        button.image = PetArt.statusBarImage(moods: appState.petMoods, bob: bob)
-        button.imagePosition = .imageOnly
-        button.title = ""
-        button.toolTip = appState.petStatusSummary()
-    }
-
-    private func focusPet(_ kind: PetKind) {
-        appState.focusedPet = kind
-        if let provider = kind.meterProvider {
-            appState.selectedProvider = provider
+    private var visibleMenuTitle: String {
+        let compact: String
+        switch appState.selectedProvider {
+        case .codex:
+            compact = appState.compactMenuTitle
+        case .claude:
+            compact = appState.claudeCompactMenuTitle
+        case .cursor:
+            compact = appState.cursorCompactMenuTitle
         }
-        popover.performClose(nil)
-        showPetsWindow()
+        if compact.isEmpty || compact == "..." {
+            return "AI"
+        }
+        return compact
     }
 
-    func showPetsWindow() {
-        if let petsWindow {
-            petsWindow.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
+    private var menuToolTip: String {
+        switch appState.selectedProvider {
+        case .codex:
+            return "Codex \(appState.compactMenuTitle)"
+        case .claude:
+            return "Claude \(appState.claudeFloatingSummary)"
+        case .cursor:
+            return "Cursor \(appState.cursorFloatingSummary)"
         }
-
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1120, height: 780),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "MenuBar Pets"
-        window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
-        window.titlebarSeparatorStyle = .none
-        window.backgroundColor = NSColor(calibratedRed: 0.05, green: 0.05, blue: 0.11, alpha: 1)
-        window.minSize = NSSize(width: 960, height: 680)
-        window.isReleasedWhenClosed = false
-        window.contentViewController = NSHostingController(rootView: PetsGalleryView(appState: appState))
-        window.center()
-        petsWindow = window
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
     }
 
     func showFloatingStatus() {
@@ -358,7 +305,7 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func showWindowFromFloatingStatus() {
-        showPetsWindow()
+        showMeterWindow()
     }
 
     func showMeterWindow() {
