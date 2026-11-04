@@ -21,7 +21,7 @@ struct QuotaCard: View {
                 Text(window.remainingPercentText)
                     .font(.system(size: isPrimary ? 29 : 27, weight: .black, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(MeterTheme.ink)
+                    .foregroundStyle(MeterTheme.fill(for: window.kind))
                     .lineLimit(1)
 
                 segmentedProgress
@@ -30,7 +30,7 @@ struct QuotaCard: View {
                     Circle()
                         .fill(MeterTheme.healthColor(for: window.healthLevel))
                         .frame(width: 7, height: 7)
-                        .overlay(Circle().stroke(MeterTheme.ink, lineWidth: 0.9))
+                        .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 0.9))
 
                     Text(healthText)
                         .fontWeight(.bold)
@@ -58,14 +58,7 @@ struct QuotaCard: View {
         HStack(spacing: 2.5) {
             ForEach(0..<10, id: \.self) { index in
                 RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                    .fill(index < filledSegments ? MeterTheme.coral : MeterTheme.idleBlock.opacity(0.72))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                            .stroke(
-                                index < filledSegments ? MeterTheme.ink : Color.clear,
-                                lineWidth: 0.8
-                            )
-                    )
+                    .fill(index < filledSegments ? MeterTheme.fill(for: window.kind) : MeterTheme.idleBlock)
                     .frame(maxWidth: .infinity)
             }
         }

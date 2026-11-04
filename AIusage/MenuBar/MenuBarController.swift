@@ -39,7 +39,7 @@ final class MenuBarController: NSObject {
         popover.behavior = .transient
         popover.animates = true
         popover.appearance = NSAppearance(named: .darkAqua)
-        popover.contentSize = NSSize(width: 446, height: 360)
+        popover.contentSize = NSSize(width: 408, height: 360)
         let host = NSHostingController(rootView: PetsMenuView(appState: appState))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
@@ -379,10 +379,11 @@ final class MenuBarController: NSObject {
         window.title = "AIusage"
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
+        window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(
-            calibratedRed: 0.996,
-            green: 0.958,
-            blue: 0.866,
+            calibratedRed: 0.07,
+            green: 0.06,
+            blue: 0.12,
             alpha: 1
         )
         window.center()

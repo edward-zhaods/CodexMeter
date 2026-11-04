@@ -49,16 +49,9 @@ struct ClaudeUsageView: View {
                     Text(compactTokens(today.total))
                         .font(.system(size: 34, weight: .black, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(MeterTheme.ink)
+                        .foregroundStyle(MeterTheme.accent(for: .claude))
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
-                        .rotationEffect(.degrees(-0.7), anchor: .leading)
 
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text("输出 \(compactTokens(today.output)) · 缓存读 \(compactTokens(today.cacheRead)) · \(today.messages.formatted()) 轮")
@@ -96,13 +89,7 @@ struct ClaudeUsageView: View {
 
                     Text(emptyTitle)
                         .font(.system(size: 31, weight: .black, design: .rounded))
-                        .foregroundStyle(MeterTheme.ink)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
+                        .foregroundStyle(MeterTheme.accent(for: .claude))
 
                     Text(emptyDetail)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -217,7 +204,7 @@ struct ClaudeUsageView: View {
                         .fill(color)
                         .overlay(
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .stroke(MeterTheme.ink, lineWidth: 1)
+                                .stroke(Color.black.opacity(0.28), lineWidth: 1)
                         )
                         .frame(width: max(8, proxy.size.width * CGFloat(min(1, max(0, ratio)))))
                 }
@@ -326,7 +313,7 @@ private struct ClaudeSettingsCard: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true, prominent: true))
                     .help("重新统计")
                     .disabled(appState.claudeScanState == .scanning)
                 }
@@ -343,7 +330,7 @@ private struct ClaudeSettingsCard: View {
                     Button("退出") {
                         NSApplication.shared.terminate(nil)
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true, prominent: true))
                 }
             }
             .padding(14)

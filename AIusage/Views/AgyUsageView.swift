@@ -49,16 +49,9 @@ struct AgyUsageView: View {
                     Text(percent)
                         .font(.system(size: 34, weight: .black, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(MeterTheme.ink)
+                        .foregroundStyle(MeterTheme.accent(for: .agy))
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
-                        .rotationEffect(.degrees(-0.7), anchor: .leading)
 
                     Text(detail)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -104,13 +97,7 @@ struct AgyUsageView: View {
 
                     Text(emptyTitle)
                         .font(.system(size: 31, weight: .black, design: .rounded))
-                        .foregroundStyle(MeterTheme.ink)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
+                        .foregroundStyle(MeterTheme.accent(for: .agy))
 
                     Text(emptyDetail)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))

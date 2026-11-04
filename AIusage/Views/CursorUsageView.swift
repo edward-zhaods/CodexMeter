@@ -50,16 +50,9 @@ struct CursorUsageView: View {
                     Text(plan.remainingPercentText)
                         .font(.system(size: 34, weight: .black, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(MeterTheme.ink)
+                        .foregroundStyle(MeterTheme.accent(for: .cursor))
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
-                        .rotationEffect(.degrees(-0.7), anchor: .leading)
 
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(resetLine(for: plan))
@@ -97,13 +90,7 @@ struct CursorUsageView: View {
 
                     Text(emptyTitle)
                         .font(.system(size: 31, weight: .black, design: .rounded))
-                        .foregroundStyle(MeterTheme.ink)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
+                        .foregroundStyle(MeterTheme.accent(for: .cursor))
 
                     Text(emptyDetail)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -268,7 +255,7 @@ struct CursorUsageView: View {
                         .fill(color)
                         .overlay(
                             RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                .stroke(MeterTheme.ink, lineWidth: 1)
+                                .stroke(Color.black.opacity(0.28), lineWidth: 1)
                         )
                         .frame(width: max(8, proxy.size.width * CGFloat(min(1, max(0, ratio)))))
                 }
@@ -376,7 +363,7 @@ private struct CursorSettingsCard: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true, prominent: true))
                     .help("重新同步")
                     .disabled(appState.cursorSyncState == .syncing)
                 }
@@ -393,7 +380,7 @@ private struct CursorSettingsCard: View {
                     Button("退出") {
                         NSApplication.shared.terminate(nil)
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true, prominent: true))
                 }
             }
             .padding(14)

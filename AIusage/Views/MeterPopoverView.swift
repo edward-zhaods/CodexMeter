@@ -1,18 +1,32 @@
 import SwiftUI
 
 enum MeterTheme {
-    static let paper = Color(red: 0.996, green: 0.958, blue: 0.866)
-    static let panel = Color(red: 0.998, green: 0.989, blue: 0.958)
-    static let ink = Color(red: 0.132, green: 0.112, blue: 0.094)
-    static let mutedInk = Color(red: 0.43, green: 0.39, blue: 0.34)
+    static let paper = Color(red: 0.07, green: 0.06, blue: 0.12)
+    static let panel = Color(red: 0.11, green: 0.10, blue: 0.18)
+    static let ink = Color(red: 0.95, green: 0.96, blue: 0.99)
+    static let mutedInk = Color(red: 0.62, green: 0.67, blue: 0.78)
+    static let onAccent = Color(red: 0.07, green: 0.06, blue: 0.12)
     static let yellow = Color(red: 1.0, green: 0.84, blue: 0.29)
-    static let pink = Color(red: 0.96, green: 0.66, blue: 0.76)
-    static let blue = Color(red: 0.59, green: 0.81, blue: 0.94)
-    static let coral = Color(red: 1.0, green: 0.34, blue: 0.18)
-    static let idleBlock = Color(red: 0.93, green: 0.86, blue: 0.70)
-    static let success = Color(red: 0.14, green: 0.55, blue: 0.30)
-    static let warning = Color(red: 0.82, green: 0.48, blue: 0.05)
-    static let danger = Color(red: 0.82, green: 0.16, blue: 0.12)
+    static let pink = Color(red: 0.98, green: 0.55, blue: 0.74)
+    static let blue = Color(red: 0.45, green: 0.78, blue: 1.0)
+    static let coral = Color(red: 1.0, green: 0.45, blue: 0.32)
+    static let idleBlock = Color(red: 0.20, green: 0.22, blue: 0.32)
+    static let success = Color(red: 0.30, green: 0.86, blue: 0.52)
+    static let warning = Color(red: 1.0, green: 0.72, blue: 0.28)
+    static let danger = Color(red: 1.0, green: 0.40, blue: 0.36)
+
+    static func accent(for provider: MeterProvider) -> Color {
+        switch provider {
+        case .codex:
+            return Color(red: 0.22, green: 0.86, blue: 0.49)
+        case .cursor:
+            return Color(red: 0.67, green: 0.48, blue: 0.98)
+        case .agy:
+            return Color(red: 0.31, green: 0.72, blue: 1)
+        case .claude:
+            return Color(red: 1, green: 0.62, blue: 0.32)
+        }
+    }
 
     static func fill(for kind: QuotaWindowKind) -> Color {
         switch kind {
@@ -37,64 +51,74 @@ enum MeterTheme {
     }
 }
 
+private struct MeterAccentKey: EnvironmentKey {
+    static let defaultValue = Color(red: 0.22, green: 0.86, blue: 0.49)
+}
+
+extension EnvironmentValues {
+    var meterAccent: Color {
+        get { self[MeterAccentKey.self] }
+        set { self[MeterAccentKey.self] = newValue }
+    }
+}
+
 struct RetroCard<Content: View>: View {
-    let fill: Color
+    @Environment(\.meterAccent) private var meterAccent
     let cornerRadius: CGFloat
-    let shadowOffset: CGSize
-    @ViewBuilder let content: Content
+    let content: Content
 
     init(
-        fill: Color,
+        fill: Color = MeterTheme.panel,
         cornerRadius: CGFloat = 14,
         shadowOffset: CGSize = CGSize(width: 4, height: 6),
         @ViewBuilder content: () -> Content
     ) {
-        self.fill = fill
         self.cornerRadius = cornerRadius
-        self.shadowOffset = shadowOffset
         self.content = content()
+        _ = fill
+        _ = shadowOffset
     }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-        ZStack {
-            shape
-                .fill(MeterTheme.ink)
-                .offset(x: shadowOffset.width, y: shadowOffset.height)
-
-            content
-                .background(shape.fill(fill))
-                .clipShape(shape)
-                .overlay(
-                    shape
-                        .stroke(MeterTheme.ink, lineWidth: 2.4)
-                )
-        }
-        .padding(.trailing, max(0, shadowOffset.width))
-        .padding(.bottom, max(0, shadowOffset.height))
+        content
+            .background {
+                ZStack {
+                    shape.fill(MeterTheme.panel)
+                    shape.fill(meterAccent.opacity(0.10))
+                }
+            }
+            .clipShape(shape)
+            .overlay(shape.stroke(meterAccent, lineWidth: 1.5))
+            .shadow(color: meterAccent.opacity(0.28), radius: 8, y: 0)
     }
 }
 
 struct RetroButtonStyle: ButtonStyle {
     var fill: Color = MeterTheme.panel
     var compact = false
+    var prominent = false
 
     func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed
         configuration.label
             .font(.system(size: compact ? 11 : 12, weight: .bold, design: .rounded))
-            .foregroundStyle(MeterTheme.ink)
+            .foregroundStyle((prominent || pressed) ? MeterTheme.onAccent : MeterTheme.ink)
             .padding(.horizontal, compact ? 8 : 11)
             .frame(height: compact ? 26 : 30)
             .background(
-                configuration.isPressed ? MeterTheme.yellow : fill,
-                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                pressed ? MeterTheme.yellow : fill,
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(MeterTheme.ink, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(
+                        prominent ? Color.black.opacity(0.28) : Color.white.opacity(0.16),
+                        lineWidth: 1
+                    )
             )
-            .offset(y: configuration.isPressed ? 1 : 0)
+            .offset(y: pressed ? 1 : 0)
     }
 }
 
@@ -106,7 +130,7 @@ struct RetroDotPattern: View {
                     let dot = CGRect(x: x, y: y, width: 3.2, height: 3.2)
                     context.fill(
                         Path(ellipseIn: dot),
-                        with: .color(MeterTheme.ink.opacity(0.09))
+                        with: .color(MeterTheme.ink.opacity(0.16))
                     )
                 }
             }
@@ -147,7 +171,7 @@ private struct TokenMonthMarker: Identifiable {
 }
 
 private enum TokenActivityPalette {
-    static let inactive = Color(red: 0.93, green: 0.93, blue: 0.92)
+    static let inactive = Color(red: 0.18, green: 0.20, blue: 0.28)
 
     static func color(for level: Int) -> Color {
         switch level {
@@ -327,22 +351,18 @@ struct TokenActivityView: View {
             Spacer(minLength: 0)
 
             RoundedRectangle(cornerRadius: 3)
-                .fill(MeterTheme.coral)
+                .fill(metricFill(for: title))
                 .frame(height: 7)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 3)
-                        .stroke(MeterTheme.ink, lineWidth: 1)
-                )
         }
         .padding(9)
         .frame(maxWidth: .infinity, minHeight: 83, alignment: .leading)
         .background(
-            metricFill(for: title),
+            MeterTheme.panel,
             in: RoundedRectangle(cornerRadius: 9, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .stroke(MeterTheme.ink, lineWidth: 1.5)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
         )
     }
 
@@ -445,13 +465,13 @@ struct TokenActivityView: View {
     private func metricFill(for title: String) -> Color {
         switch title {
         case "累计 TOKEN":
-            return MeterTheme.yellow.opacity(0.86)
+            return MeterTheme.yellow
         case "单日峰值":
-            return MeterTheme.pink.opacity(0.84)
+            return MeterTheme.pink
         case "当前连续":
-            return MeterTheme.blue.opacity(0.86)
+            return MeterTheme.blue
         default:
-            return MeterTheme.paper
+            return MeterTheme.coral
         }
     }
 }
@@ -563,6 +583,7 @@ private func activityLevel(tokens: Int64, maximum: Int64) -> Int {
 
 struct MeterPopoverView: View {
     @ObservedObject var appState: AppState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var heroWindow: QuotaWindowViewModel? {
         appState.fiveHourWindow ?? appState.weeklyWindow
@@ -593,7 +614,8 @@ struct MeterPopoverView: View {
         .scrollIndicators(.hidden)
         .frame(width: 460, height: 620)
         .background(MeterTheme.paper)
-        .environment(\.colorScheme, .light)
+        .environment(\.colorScheme, .dark)
+        .environment(\.meterAccent, MeterTheme.accent(for: appState.selectedProvider))
     }
 
     @ViewBuilder
@@ -642,54 +664,67 @@ struct MeterPopoverView: View {
                 }
                 .buttonStyle(
                     RetroButtonStyle(
-                        fill: appState.selectedProvider == provider ? MeterTheme.pink : MeterTheme.panel
+                        fill: appState.selectedProvider == provider
+                            ? MeterTheme.accent(for: provider)
+                            : MeterTheme.panel,
+                        prominent: appState.selectedProvider == provider
                     )
                 )
             }
         }
     }
 
-    private var headerLabel: String {
+    private var selectedPet: PetKind {
         switch appState.selectedProvider {
         case .codex:
-            return "CODEX"
-        case .claude:
-            return "CLAUDE CODE"
+            return .codex
         case .cursor:
-            return "CURSOR"
+            return .cursor
         case .agy:
-            return "AGY"
-        }
-    }
-
-    private var headerTitle: String {
-        switch appState.selectedProvider {
-        case .codex:
-            return "额度面板"
+            return .gemini
         case .claude:
-            return "用量面板"
-        case .cursor:
-            return "额度面板"
-        case .agy:
-            return "额度面板"
+            return .claude
         }
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(headerLabel)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .tracking(2.2)
-                    .foregroundStyle(MeterTheme.mutedInk)
+        let pet = selectedPet
+        let mood = appState.petMoods[pet] ?? .idle
+        return HStack(alignment: .center, spacing: 12) {
+            headerSprite(pet: pet, mood: mood)
 
-                Text(headerTitle)
-                    .font(.system(size: 23, weight: .black, design: .rounded))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pet.menuTitle(vacation: false))
+                    .font(.system(size: 20, weight: .black, design: .rounded))
                     .foregroundStyle(MeterTheme.ink)
+                    .lineLimit(1)
+
+                Text(pet.subtitle(vacation: false))
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(MeterTheme.accent(for: appState.selectedProvider))
+                    .lineLimit(1)
             }
 
             Spacer()
             statusBadge
+        }
+    }
+
+    private func headerSprite(pet: PetKind, mood: PetMood) -> some View {
+        TimelineView(.animation(minimumInterval: 0.5, paused: reduceMotion || mood != .working)) { timeline in
+            let frame = mood == .working && !reduceMotion
+                ? Int(timeline.date.timeIntervalSinceReferenceDate / 0.5) % PetPixels.frameCount
+                : 0
+            let sprite = PetPixels.image(
+                for: pet,
+                pose: mood == .working ? .working : .idle,
+                frame: frame
+            )
+            Image(nsImage: sprite)
+                .resizable()
+                .interpolation(.none)
+                .frame(width: sprite.size.width * 3, height: sprite.size.height * 3)
+                .opacity(mood == .offline ? 0.4 : 1)
         }
     }
 
@@ -711,16 +746,9 @@ struct MeterPopoverView: View {
                     Text(heroCountdownText(for: window))
                         .font(.system(size: 34, weight: .black, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(MeterTheme.ink)
+                        .foregroundStyle(MeterTheme.accent(for: .codex))
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
-                        .rotationEffect(.degrees(-0.7), anchor: .leading)
 
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(heroResetDateText(for: window))
@@ -758,13 +786,7 @@ struct MeterPopoverView: View {
 
                     Text("额度同步中")
                         .font(.system(size: 31, weight: .black, design: .rounded))
-                        .foregroundStyle(MeterTheme.ink)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 6)
-                        .background(
-                            MeterTheme.yellow,
-                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        )
+                        .foregroundStyle(MeterTheme.accent(for: .codex))
 
                     Text("正在读取 Codex app-server 数据")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -846,7 +868,7 @@ struct MeterPopoverView: View {
                         .frame(width: 12, height: 12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 3)
-                                .stroke(MeterTheme.ink, lineWidth: 1.2)
+                                .stroke(Color.black.opacity(0.28), lineWidth: 1.2)
                         )
                     Text("APP-SERVER")
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
@@ -887,7 +909,7 @@ struct MeterPopoverView: View {
             Circle()
                 .fill(statusColor)
                 .frame(width: 8, height: 8)
-                .overlay(Circle().stroke(MeterTheme.ink, lineWidth: 1))
+                .overlay(Circle().stroke(Color.white.opacity(0.35), lineWidth: 1))
 
             Text(statusBadgeText)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -902,7 +924,7 @@ struct MeterPopoverView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(MeterTheme.ink, lineWidth: 1.6)
+                .stroke(MeterTheme.accent(for: appState.selectedProvider), lineWidth: 1.2)
         )
     }
 

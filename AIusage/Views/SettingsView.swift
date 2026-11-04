@@ -28,7 +28,7 @@ struct SettingsView: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.yellow, compact: true, prominent: true))
                     .help("刷新")
                 }
 
@@ -53,8 +53,9 @@ struct SettingsView: View {
                                 RetroButtonStyle(
                                     fill: appState.floatingDisplayStyle == style
                                         ? MeterTheme.pink
-                                        : MeterTheme.paper,
-                                    compact: true
+                                        : MeterTheme.panel,
+                                    compact: true,
+                                    prominent: appState.floatingDisplayStyle == style
                                 )
                             )
                         }
@@ -89,12 +90,12 @@ struct SettingsView: View {
                             await appState.reconnect()
                         }
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.blue, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.blue, compact: true, prominent: true))
 
                     Button("退出") {
                         NSApplication.shared.terminate(nil)
                     }
-                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true))
+                    .buttonStyle(RetroButtonStyle(fill: MeterTheme.pink, compact: true, prominent: true))
                 }
             }
             .padding(14)

@@ -53,7 +53,7 @@ struct PetsMenuView: View {
             }
         }
         .padding(14)
-        .frame(width: 430)
+        .frame(width: 392)
         .fixedSize(horizontal: false, vertical: true)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -72,7 +72,7 @@ struct PetsMenuView: View {
         let shownFrame = mood == .working ? frame : 0
         let sprite = PetPixels.image(for: kind, pose: pose, frame: shownFrame)
         let glance = appState.quotaGlance(for: kind)
-        return HStack(spacing: 10) {
+        return HStack(spacing: 8) {
             Image(nsImage: sprite)
                 .resizable()
                 .interpolation(.none)
@@ -83,10 +83,9 @@ struct PetsMenuView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(PetPalette.text)
                 .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
 
-            Spacer(minLength: 8)
-
-            VStack(alignment: .trailing, spacing: 1) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(glance.primary)
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(PetPalette.text)
@@ -99,6 +98,8 @@ struct PetsMenuView: View {
                 }
             }
             .fixedSize(horizontal: true, vertical: false)
+
+            Spacer(minLength: 12)
 
             Text(mood.title)
                 .font(.system(size: 12, weight: .semibold))
