@@ -784,16 +784,16 @@ enum PetPixels {
         case .claude:
             rows = claudeRows
         }
-        let image = render(rows)
-        cache[kind] = image
-        return image
+        let sprite = render(rows)
+        cache[kind] = sprite
+        return sprite
     }
 
     static func statusBarImage(moods: [PetKind: PetMood], bob: Bool) -> NSImage {
         let height: CGFloat = 18
         let gap: CGFloat = 3
         let pets = PetKind.allCases
-        let icons = pets.map { image(for: $0) }
+        let icons = pets.map { Self.image(for: $0) }
         let widths = icons.map { icon -> CGFloat in
             let size = icon.size
             guard size.height > 0 else { return height }
@@ -826,22 +826,22 @@ enum PetPixels {
             let yOffset: CGFloat = bob && mood == .working ? 1 : 0
             let rect = NSRect(x: x, y: yOffset, width: widths[index], height: height)
             let fraction: CGFloat = mood == .offline ? 0.38 : 1
-            icons[index].draw(in: rect, from: .zero, operation: .sourceOver, fraction: fraction)
+            icons[index].draw(in: rect, from: NSRect.zero, operation: NSCompositingOperation.sourceOver, fraction: fraction)
             x += widths[index] + gap
         }
         NSGraphicsContext.restoreGraphicsState()
-        let image = NSImage(size: rep.size)
-        image.addRepresentation(rep)
-        image.isTemplate = false
-        return image
+        let composed = NSImage(size: rep.size)
+        composed.addRepresentation(rep)
+        composed.isTemplate = false
+        return composed
     }
 
     private static func render(_ rows: [String]) -> NSImage {
         let height = rows.count
         let width = rows[0].split(separator: " ").count
         let size = NSSize(width: width, height: height)
-        let image = NSImage(size: size)
-        image.lockFocus()
+        let sprite = NSImage(size: size)
+        sprite.lockFocus()
         NSGraphicsContext.current?.imageInterpolation = .none
         for (y, line) in rows.enumerated() {
             let values = line.split(separator: " ")
@@ -856,8 +856,8 @@ enum PetPixels {
                 NSRect(x: x, y: height - 1 - y, width: 1, height: 1).fill()
             }
         }
-        image.unlockFocus()
-        image.isTemplate = false
-        return image
+        sprite.unlockFocus()
+        sprite.isTemplate = false
+        return sprite
     }
 }
