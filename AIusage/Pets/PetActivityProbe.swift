@@ -62,11 +62,14 @@ enum PetActivityProbe {
                 home.appendingPathComponent(".cursor/ai-tracking")
             ]
         )
+        // Quota reads rewrite logs under ~/.gemini. Only a real conversation
+        // transcript means Agy is working. Those files sit in a hidden folder.
         let gemini = newestFile(
             in: [
-                home.appendingPathComponent(".gemini"),
-                home.appendingPathComponent(".config/gemini")
-            ]
+                home.appendingPathComponent(".gemini/antigravity-cli/brain")
+            ],
+            includeHidden: true,
+            allowedFileNames: ["transcript.jsonl", "transcript_full.jsonl"]
         )
         let claude = newestFile(
             in: [
@@ -85,7 +88,11 @@ enum PetActivityProbe {
         )
     }
 
-    private static func newestFile(in roots: [URL]) -> (present: Bool, latest: Date?) {
+    private static func newestFile(
+        in roots: [URL],
+        includeHidden: Bool = false,
+        allowedFileNames: Set<String>? = nil
+    ) -> (present: Bool, latest: Date?) {
         let fileManager = FileManager.default
         var present = false
         var latest: Date?
@@ -94,12 +101,19 @@ enum PetActivityProbe {
             guard fileManager.fileExists(atPath: root.path, isDirectory: &isDirectory) else { continue }
             present = true
             guard isDirectory.boolValue else {
+                if allowedFileNames?.contains(root.lastPathComponent) == false {
+                    continue
+                }
                 if let date = modificationDate(of: root), latest.map({ date > $0 }) ?? true {
                     latest = date
                 }
                 continue
             }
-            if let date = latestFileDate(in: root) {
+            if let date = latestFileDate(
+                in: root,
+                includeHidden: includeHidden,
+                allowedFileNames: allowedFileNames
+            ) {
                 if let latest, date <= latest {
                     continue
                 }
@@ -109,9 +123,14 @@ enum PetActivityProbe {
         return (present, latest)
     }
 
-    private static func latestFileDate(in root: URL) -> Date? {
+    private static func latestFileDate(
+        in root: URL,
+        includeHidden: Bool = false,
+        allowedFileNames: Set<String>? = nil
+    ) -> Date? {
         let fileManager = FileManager.default
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .contentModificationDateKey]
+        let options: FileManager.DirectoryEnumerationOptions = includeHidden ? [] : [.skipsHiddenFiles]
         var latest: Date?
         var seen = 0
         var queue: [(URL, Int)] = [(root, 0)]
@@ -124,7 +143,7 @@ enum PetActivityProbe {
                 let children = (try? fileManager.contentsOfDirectory(
                     at: url,
                     includingPropertiesForKeys: Array(keys),
-                    options: [.skipsHiddenFiles]
+                    options: options
                 )) ?? []
                 let sorted = children.sorted {
                     (modificationDate(of: $0) ?? .distantPast) > (modificationDate(of: $1) ?? .distantPast)
@@ -133,6 +152,9 @@ enum PetActivityProbe {
                     queue.append((child, depth + 1))
                 }
             } else if let date = values?.contentModificationDate {
+                if let allowedFileNames, !allowedFileNames.contains(url.lastPathComponent) {
+                    continue
+                }
                 if latest == nil || date > latest! {
                     latest = date
                 }
